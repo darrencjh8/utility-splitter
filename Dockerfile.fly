@@ -1,0 +1,43 @@
+# Build Stage
+FROM node:18-alpine as build
+WORKDIR /app
+
+# Copy root package files for frontend build
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Copy frontend source code
+COPY . .
+
+# Build arguments for frontend (passed from fly.toml or secrets)
+ARG VITE_API_USER
+ARG VITE_API_PASS
+ENV VITE_API_USER=$VITE_API_USER
+ENV VITE_API_PASS=$VITE_API_PASS
+
+# Build the frontend
+RUN npm run build
+
+# Runtime Stage
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy backend package files
+COPY server/package.json server/package-lock.json* ./server/
+WORKDIR /app/server
+RUN npm install --production
+
+# Copy backend source code
+COPY server/ .
+
+# Copy built frontend from build stage
+COPY --from=build /app/dist ../dist
+
+# Create data directory for volume mount
+RUN mkdir -p data
+
+# Expose the port
+EXPOSE 3000
+
+# Start the server
+CMD ["node", "index.js"]
