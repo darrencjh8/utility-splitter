@@ -2,20 +2,55 @@
 
 A web application for tracking and splitting monthly utility bills among housemates. Built with React, TypeScript, Vite, and Node.js.
 
+## Use Case
+```mermaid
+graph TD
+    %% Define Nodes
+    subgraph S1 ["1. Data Ingestion & Setup"]
+        A["Incoming Bill Email"] --> B("Gmail Filter/Label");
+        B --> C{"Label: Bills-Pending"};
+    end
+
+    subgraph S2 ["2. Script Automation"]
+        E["Apps Script: processMonthlyBills"]
+        E --> F{"Check Bills-Pending Threads?"};
+        F -- Yes --> G["Extract Date/Amount"];
+        G --> H["Log to BillHistories Sheet"];
+        H --> I("Change Email Label to Bills-Processed");
+        I --> J("Check FixedBills / Backfill Missing Entries");
+    end
+
+    subgraph S3 ["3. Consolidation & Notification"]
+        K{"Check BillStatus Sheet"};
+        K --> L{"All Vendors Received for Month?"};
+        L -- No --> M["Wait for Next Hourly Run"];
+        L -- Yes --> N["Calculate Shares (Based on BillSplits/ManualBills)"];
+        N --> O["Log Final Amounts to PaidBills Sheet"];
+        O --> P("Send Consolidated Email Summary to Housemates");
+    end
+
+    %% --- Connections between Subgraphs ---
+
+    %% Connect Setup (C) to Automation Start (E)
+    C --> E;
+
+    %% Connect Automation End (J) to Consolidation Start (K)
+    J --> K;
+
+    %% Connect Loopback (M) to Automation Start (E)
+    M --> E;
+```
+
+## Pre-requisites (Google Apps Script Setup)
+
+Before you can fully utilize the application's backend functionalities, you need to set up the Google Apps Script as detailed in the [`gAppScripts/Readme.md`](gAppScripts/Readme.md) file. This involves configuring the script to interact with your Google Sheets for data storage and processing.
+
 # Known issues
 
-- API call to backend is not working
-- Password should be stored in session that expires, not local storage
+- Backend API is currently unused; Frontend communicates directly with Google Sheets via OAuth.
 
 # Future Improvements
-
-- TenantID should be changed to email which can be extracted by Parseur
-- Implement automation workflow using Parseur and Google Sheet
-- Input field for a google oauth2 in the frontend, to pull data from google sheet
-- Extract data from this sheet to display in the frontend
-- PUT API has to manage conflict management between user input data or data input by automation workflow
-- Protect API with basic auth
-
+- PUT API to add data into overrideBills
 
 ## Prerequisites
 
@@ -23,19 +58,7 @@ A web application for tracking and splitting monthly utility bills among housema
 -   [Docker](https://www.docker.com/)
 -   [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
 
-## Configuration
 
-Create a `.env` file in the root directory. **Do not commit this file.**
-
-```env
-# Backend Credentials (for API access)
-API_USER=admin
-API_PASS=your_secure_password
-
-# Frontend Build Args (must match backend credentials)
-VITE_API_USER=admin
-VITE_API_PASS=your_secure_password
-```
 
 ## Local Development
 
@@ -44,20 +67,9 @@ To run the application locally with hot-reloading:
 1.  **Install Dependencies**:
     ```bash
     npm install
-    cd server && npm install && cd ..
     ```
 
-2.  **Start the Backend**:
-    ```bash
-    # In a new terminal
-    cd server
-    # Ensure you have set API_USER and API_PASS environment variables
-    # Linux/Mac: export API_USER=admin API_PASS=pass node index.js
-    # Windows (PowerShell): $env:API_USER="admin"; $env:API_PASS="pass"; node index.js
-    node index.js
-    ```
-
-3.  **Start the Frontend**:
+2.  **Start the Frontend**:
     ```bash
     # In a separate terminal
     npm run dev
@@ -70,18 +82,12 @@ To verify the production build locally using Docker:
 
 1.  **Build the Image**:
     ```bash
-    docker build -t utility-splitter:local \
-      --build-arg VITE_API_USER=admin \
-      --build-arg VITE_API_PASS=your_secure_password \
-      -f Dockerfile.fly .
+    docker build -t utility-splitter:local -f Dockerfile.fly .
     ```
 
 2.  **Run the Container**:
     ```bash
-    docker run -p 3000:3000 \
-      -e API_USER=admin \
-      -e API_PASS=your_secure_password \
-      utility-splitter:local
+    docker run -p 3000:80 utility-splitter:local
     ```
     Access the app at `http://localhost:3000`.
 
@@ -103,10 +109,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 ```bash
 # Build the image
-docker build -t your-username/utility-splitter:latest \
-  --build-arg VITE_API_USER=admin \
-  --build-arg VITE_API_PASS=your_secure_password \
-  -f Dockerfile.fly .
+docker build -t your-username/utility-splitter:latest -f Dockerfile.fly .
 
 # Push to Docker Hub
 docker push your-username/utility-splitter:latest
@@ -119,17 +122,7 @@ docker push your-username/utility-splitter:latest
     fly apps create utility-splitter
     ```
 
-2.  **Set Secrets** (Backend):
-    ```bash
-    fly secrets set API_USER=admin API_PASS=your_secure_password
-    ```
-
-3.  **Create Volume** (for persistent data):
-    ```bash
-    fly volumes create utility_data --region sin --size 1
-    ```
-
-4.  **Deploy**:
+2.  **Deploy**:
     ```bash
     fly deploy --image your-username/utility-splitter:latest
     ```

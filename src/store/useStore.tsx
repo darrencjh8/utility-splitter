@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import type { Housemate, BillType, BillCategory } from '../types';
 import { GoogleSheetsService } from '../services/GoogleSheetsService';
 
@@ -34,7 +34,42 @@ const initialMeta: StoreMeta = {
     availableYears: [new Date().getFullYear().toString()],
 };
 
-export const useStore = () => {
+interface StoreContextType {
+    isLoading: boolean;
+    isError: boolean;
+    errorType: 'API' | 'AUTH' | null;
+    spreadsheetId: string | null;
+    accessToken: string | null;
+    housemates: Housemate[];
+    bills: BillType[];
+    billCategories: BillCategory[];
+    balances: Record<string, number>;
+    availableYears: string[];
+    currentYear: string;
+    monthStatus: Record<string, any>;
+    setSheetId: (id: string) => void;
+    handleLoginSuccess: (token: string) => void;
+    addBill: (bill: BillType) => Promise<void>;
+    addHousemate: (housemate: Housemate) => void;
+    loadYear: (year: string) => Promise<void>;
+    removeHousemate: (id: string) => void;
+    updateHousemate: (id: string, name: string) => void;
+    deleteBill: (id: string) => void;
+    updateBill: (bill: BillType) => void;
+    addBillCategory: (category: BillCategory) => void;
+    deleteBillCategory: (id: string) => void;
+    updateBillCategory: (id: string, name: string) => void;
+    exportData: () => Promise<string>;
+    importData: (json: string) => Promise<boolean>;
+    isDarkMode: boolean;
+    toggleDarkMode: () => void;
+    isSyncing: boolean;
+    syncData: () => Promise<void>;
+}
+
+const StoreContext = createContext<StoreContextType | null>(null);
+
+export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [errorType, setErrorType] = useState<'API' | 'AUTH' | null>(null);
@@ -44,11 +79,20 @@ export const useStore = () => {
 
     const isLoaded = useRef(false);
 
-    const [data, setData] = useState<StoreData>({
-        meta: initialMeta,
-        currentYear: new Date().getFullYear().toString(),
-        currentBills: [],
-        monthStatus: {}
+    const [data, setData] = useState<StoreData>(() => {
+        const saved = localStorage.getItem('store_data');
+        return saved ? JSON.parse(saved) : {
+            meta: initialMeta,
+            currentYear: new Date().getFullYear().toString(),
+            currentBills: [],
+            monthStatus: {}
+        };
+    });
+
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const saved = localStorage.getItem('dark_mode');
+        if (saved) return JSON.parse(saved);
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
     });
 
     // Helper to parse bills from ManualBills sheet
@@ -313,13 +357,58 @@ export const useStore = () => {
         }
     }, []);
 
+    const syncData = useCallback(async () => {
+        if (!spreadsheetId || !accessToken) return;
+        setIsSyncing(true);
+        try {
+            await loadData(spreadsheetId);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [spreadsheetId, accessToken, loadData]);
+
     useEffect(() => {
         if (accessToken && spreadsheetId) {
-            loadData(spreadsheetId);
+            // OPTIMIZATION: Check if we already have data in local storage
+            const hasLocalData = data.currentBills.length > 0 || data.meta.housemates.length > 0;
+
+            if (!hasLocalData) {
+                // Only fetch if local storage is empty
+                loadData(spreadsheetId);
+            } else {
+                // If we have data, just stop loading
+                setIsLoading(false);
+            }
         } else {
             setIsLoading(false);
         }
-    }, [accessToken, spreadsheetId, loadData]);
+    }, [accessToken, spreadsheetId, loadData]); // data is intentionally omitted to avoid loops, logic depends on initial state
+
+    // Persistence Effect
+    useEffect(() => {
+        localStorage.setItem('store_data', JSON.stringify(data));
+    }, [data]);
+
+    // Dark Mode Effect
+    useEffect(() => {
+        localStorage.setItem('dark_mode', JSON.stringify(isDarkMode));
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [isDarkMode]);
+
+    // Periodic Sync Effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (spreadsheetId && accessToken && !isSyncing) {
+                console.log('Auto-syncing...');
+                syncData();
+            }
+        }, 60000); // 60 seconds
+        return () => clearInterval(interval);
+    }, [spreadsheetId, accessToken, isSyncing, syncData]);
 
     const saveMeta = async (newMeta: StoreMeta) => {
         if (!spreadsheetId) return;
@@ -385,7 +474,7 @@ export const useStore = () => {
         });
     };
 
-    return {
+    const value: StoreContextType = {
         isLoading,
         isError,
         errorType,
@@ -413,16 +502,23 @@ export const useStore = () => {
         updateBillCategory: (_id: string, _name: string) => { },
         exportData: async () => "",
         importData: async (_json: string) => false,
-        isDarkMode: false,
-        toggleDarkMode: () => { },
+        isDarkMode,
+        toggleDarkMode: () => setIsDarkMode((prev: boolean) => !prev),
         isSyncing,
-        syncData: async () => {
-            setIsSyncing(true);
-            try {
-                await handleLoginSuccess(accessToken!);
-            } finally {
-                setIsSyncing(false);
-            }
-        },
+        syncData,
     };
+
+    return (
+        <StoreContext.Provider value={value}>
+            {children}
+        </StoreContext.Provider>
+    );
+};
+
+export const useStore = () => {
+    const context = useContext(StoreContext);
+    if (!context) {
+        throw new Error('useStore must be used within a StoreProvider');
+    }
+    return context;
 };
