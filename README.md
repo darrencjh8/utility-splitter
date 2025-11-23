@@ -47,10 +47,11 @@ Before you can fully utilize the application's backend functionalities, you need
 
 # Known issues
 
-- Backend API is currently unused; Frontend communicates directly with Google Sheets via OAuth.
+- Full page reload spinner when sync happens
 
 # Future Improvements
 - PUT API to add data into overrideBills
+- Warning for any sorts of bills that are added after a november bill are fully processed, by checking BillStatus Sheet
 
 ## Prerequisites
 

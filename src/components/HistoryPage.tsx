@@ -29,7 +29,7 @@ export const HistoryPage: React.FC = () => {
     }, [billHistories]);
 
     const sortedMonths = useMemo(() => {
-        return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a));
+        return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a)); // Descending order (newest first)
     }, [groupedBills]);
 
     const totalPages = Math.ceil(sortedMonths.length / itemsPerPage);
