@@ -4,20 +4,9 @@ services:
   frontend:
     build:
       context: .
-      args:
-        - VITE_API_USER=${API_USER}
-        - VITE_API_PASS=${API_PASS}
+      dockerfile: Dockerfile.fly
     ports:
-      - "80:80"
-    depends_on:
-      - backend
-
-  backend:
-    build: ./server
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./server/data:/app/data
+      - "3000:80"
     environment:
-      - API_USER=${API_USER}
-      - API_PASS=${API_PASS}
+      - NODE_ENV=production
+    restart: unless-stopped

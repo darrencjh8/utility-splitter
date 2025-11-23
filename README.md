@@ -1,6 +1,6 @@
 # Utility Splitter
 
-A web application for tracking and splitting monthly utility bills among housemates. Built with React, TypeScript, Vite, and Node.js.
+A web application for tracking and splitting monthly utility bills among housemates. Built with React, TypeScript and Vite.
 
 ## Use Case
 ```mermaid
@@ -47,11 +47,23 @@ Before you can fully utilize the application's backend functionalities, you need
 
 # Known issues
 
+- History page not sorted by month
+- Update App manifest icon to allow for more white spaces
 - Full page reload spinner when sync happens
+- Manually backfill history for the past 12 months
 
 # Future Improvements
+- Use a better icon
 - PUT API to add data into overrideBills
 - Warning for any sorts of bills that are added after a november bill are fully processed, by checking BillStatus Sheet
+- On initial load, only load a maximum of 10 years, while periodic sync only sync the current month, unless a manual sync is triggered
+- Track payment status from housemate, how much is owed
+- Automatically tracks payment when a housemate makes a payment
+    - track by bill + rent, or bill, rent separately from housemate name
+    - across different banks paynow email template, UOB DBS and OCBC
+- Automatically sends reminder email when a housemate did not pay
+- Regex management, read the mail regex from Sheet instead of hardcoding
+
 
 ## Prerequisites
 
@@ -72,7 +84,6 @@ To run the application locally with hot-reloading:
 
 2.  **Start the Frontend**:
     ```bash
-    # In a separate terminal
     npm run dev
     ```
     Access the app at `http://localhost:5173`.
@@ -83,7 +94,7 @@ To verify the production build locally using Docker:
 
 1.  **Build the Image**:
     ```bash
-    docker build -t utility-splitter:local -f Dockerfile.fly .
+    docker build -t utility-splitter:local -f Dockerfile .
     ```
 
 2.  **Run the Container**:

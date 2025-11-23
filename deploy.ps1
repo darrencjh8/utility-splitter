@@ -1,8 +1,11 @@
 # Prerequisite 
 # powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
+# Stop execution if any command fails
+$ErrorActionPreference = "Stop"
+
 # 1. Execute the docker build command
-docker build -t utility-splitter:latest -f Dockerfile.fly .
+docker build -t utility-splitter:latest -f Dockerfile .
 
 # 2. Tag and Push
 docker tag utility-splitter:latest chongjinheng/utility-splitter:latest
