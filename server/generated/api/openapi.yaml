@@ -1,0 +1,129 @@
+openapi: 3.0.0
+info:
+  description: API for managing tenant and tenant data
+  title: Tenant API
+  version: 1.0.0
+servers:
+- url: /
+paths:
+  /tenant:
+    get:
+      operationId: tenantGET
+      parameters:
+      - description: Tenant ID
+        explode: true
+        in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_tenant_get_200_response"
+          description: Successful response
+      summary: Get tenant details
+      x-eov-operation-handler: controllers/DefaultController
+    put:
+      operationId: tenantPUT
+      parameters:
+      - description: Tenant ID
+        explode: true
+        in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+        style: form
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_tenant_put_request"
+        required: true
+      responses:
+        "200":
+          description: Successful response
+      summary: Update tenant details
+      x-eov-operation-handler: controllers/DefaultController
+  /tenant/data:
+    get:
+      operationId: tenantDataGET
+      parameters:
+      - description: Tenant ID
+        explode: true
+        in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Optional year filter
+        explode: true
+        in: query
+        name: year
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                description: Encrypted tenant data
+                type: object
+          description: Successful response
+      summary: Get tenant data
+      x-eov-operation-handler: controllers/DefaultController
+    put:
+      operationId: tenantDataPUT
+      parameters:
+      - description: Tenant ID
+        explode: true
+        in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Optional year filter
+        explode: true
+        in: query
+        name: year
+        required: false
+        schema:
+          type: integer
+        style: form
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Encrypted tenant data
+              type: object
+        required: true
+      responses:
+        "200":
+          description: Successful response
+      summary: Update tenant data
+      x-eov-operation-handler: controllers/DefaultController
+components:
+  schemas:
+    _tenant_get_200_response:
+      example:
+        name: name
+        id: id
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      type: object
+    _tenant_put_request:
+      properties:
+        name:
+          type: string
+      type: object
