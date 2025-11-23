@@ -20,7 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isDar
         <aside className="hidden md:block fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
             <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    FairShare
+                    Utility Splitter
                 </h1>
             </div>
 

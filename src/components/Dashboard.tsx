@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-    const { housemates, bills, billCategories, currentYear, balances: globalBalances } = useStore();
+    const { housemates, bills, billCategories, currentYear } = useStore();
 
     const summary = useMemo(() => {
         // We only calculate expenses and payable for the CURRENT VIEW (current year)
@@ -86,7 +86,7 @@ export const Dashboard: React.FC = () => {
         return breakdown;
     }, [housemates, bills, billCategories]);
 
-    const getHousemateName = (id: string) => housemates.find(h => h.id === id)?.name || 'Unknown';
+
 
     return (
         <div className="space-y-6">
@@ -119,61 +119,44 @@ export const Dashboard: React.FC = () => {
                         <span className="text-sm font-medium">Avg. per Bill</span>
                     </div>
                     <div className="text-2xl font-bold text-slate-800 dark:text-white">
-                        ${bills.filter(b => b.type !== 'settlement').length > 0 ? (summary.totalExpenses / bills.filter(b => b.type !== 'settlement').length).toFixed(2) : '0.00'}
+                        ${(() => {
+                            const rentCategoryIds = billCategories.filter(c => c.name.toLowerCase() === 'rent').map(c => c.id);
+                            const nonRentBills = bills.filter(b => {
+                                if (b.type === 'settlement') return false;
+                                const isRent = rentCategoryIds.includes(b.categoryId) ||
+                                    b.categoryId?.toLowerCase() === 'rent' ||
+                                    b.title?.toLowerCase() === 'rent';
+                                return !isRent;
+                            });
+                            const totalExpensesExcludingRent = nonRentBills.reduce((sum, b) => sum + b.amount, 0);
+                            return nonRentBills.length > 0 ? (totalExpensesExcludingRent / nonRentBills.length).toFixed(2) : '0.00';
+                        })()}
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Net Balances */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Net Balances (Global)</h3>
-                    <div className="space-y-3">
-                        {housemates.map(h => {
-                            const balance = globalBalances[h.id] || 0;
-                            const payable = summary.totalPayable[h.id] || 0;
-                            return (
-                                <div key={h.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl transition-colors">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-medium text-slate-700 dark:text-slate-200">{h.name}</span>
-                                        <span className={`font-bold ${balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                                            {balance >= 0 ? '+' : ''}{balance.toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                                        <span>{currentYear} Share:</span>
-                                        <span>${payable.toFixed(2)}</span>
+            {/* Recent Bills */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
+                <div className="space-y-3">
+                    {bills.length === 0 ? (
+                        <p className="text-slate-400 italic">No bills recorded yet.</p>
+                    ) : (
+                        bills.slice(0, 5).map(bill => (
+                            <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
+                                <div>
+                                    <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                        {new Date(bill.date).toLocaleDateString()}
                                     </div>
                                 </div>
-                            );
-                        })}
-                        {housemates.length === 0 && <p className="text-slate-400 italic">No housemates yet.</p>}
-                    </div>
-                </div>
-
-                {/* Recent Bills */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
-                    <div className="space-y-3">
-                        {bills.length === 0 ? (
-                            <p className="text-slate-400 italic">No bills recorded yet.</p>
-                        ) : (
-                            bills.slice(0, 5).map(bill => (
-                                <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
-                                    <div>
-                                        <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
-                                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                                            Paid by {getHousemateName(bill.payerId)} • {new Date(bill.date).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
-                                        <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
-                                    </div>
+                                <div className="text-right">
+                                    <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
                                 </div>
-                            ))
-                        )}
-                    </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -223,9 +206,10 @@ export const Dashboard: React.FC = () => {
                             </div>
                         );
                     })}
-                    {housemates.every(h => Object.values(categoryBreakdown[h.id] || {}).reduce((sum, amt) => sum + amt, 0) === 0) && (
-                        <p className="text-slate-400 italic text-center py-4">No expenses recorded yet.</p>
-                    )}
+                    {housemates.every(h => Object.values(categoryBreakdown[h.id] || {}).reduce((sum, amt) => sum + amt, 0) === 0) &&
+                        bills.filter(b => b.type !== 'settlement').length === 0 && (
+                            <p className="text-slate-400 italic text-center py-4">No expenses recorded yet.</p>
+                        )}
                 </div>
             </div>
         </div>
