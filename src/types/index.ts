@@ -3,6 +3,8 @@ export interface Housemate {
     id: string;
     name: string;
     avatar?: string;
+    email?: string;
+    rowIndex?: number;
 }
 
 export type SplitMethod = 'equal' | 'percentage' | 'shares' | 'exact';

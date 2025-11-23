@@ -90,6 +90,12 @@ export class GoogleSheetsService {
         });
     }
 
+    static async clearValues(spreadsheetId: string, range: string) {
+        return this.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`, {
+            method: 'POST'
+        });
+    }
+
     // Helper to create a new spreadsheet if needed
     static async createSpreadsheet(title: string) {
         return this.fetch('https://sheets.googleapis.com/v4/spreadsheets', {

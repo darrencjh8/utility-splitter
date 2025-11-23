@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Housemate, BillType, BillCategory } from '../types';
 import { GoogleSheetsService } from '../services/GoogleSheetsService';
 
@@ -7,6 +7,7 @@ const BILLS_SHEET = 'ManualBills';
 const PAID_BILLS_SHEET = 'PaidBills';
 const BILL_HISTORIES_SHEET = 'BillHistories';
 const BILL_STATUS_SHEET = 'BillStatus';
+const HOUSEMATES_SHEET = 'Housemates';
 
 interface StoreMeta {
     housemates: Housemate[];
@@ -203,6 +204,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (existingSheets.has(PAID_BILLS_SHEET)) rangesToFetch.push(`${PAID_BILLS_SHEET}!A:F`);
             if (existingSheets.has(BILL_HISTORIES_SHEET)) rangesToFetch.push(`${BILL_HISTORIES_SHEET}!A:H`);
             if (existingSheets.has(BILL_STATUS_SHEET)) rangesToFetch.push(`${BILL_STATUS_SHEET}!A:D`);
+            if (existingSheets.has(BILL_STATUS_SHEET)) rangesToFetch.push(`${BILL_STATUS_SHEET}!A:D`);
+            if (existingSheets.has(HOUSEMATES_SHEET)) rangesToFetch.push(`${HOUSEMATES_SHEET}!A:A`);
 
             if (rangesToFetch.length === 0) {
                 setIsLoading(false);
@@ -218,19 +221,38 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 return range ? range.values : [];
             };
 
-            // 1. Parse Metadata (Legacy/Manual)
+            // 1. Parse Metadata (Legacy/Manual) - Keep for other meta, but Housemates move to BillSplits
             const metaRows = getValuesForSheet(META_SHEET) || [];
             const meta: StoreMeta = { ...initialMeta };
             metaRows.forEach((row: string[]) => {
                 try {
-                    if (row[0] === 'housemates') meta.housemates = JSON.parse(row[1]);
+                    // if (row[0] === 'housemates') meta.housemates = JSON.parse(row[1]); // Legacy
                     if (row[0] === 'billCategories') meta.billCategories = JSON.parse(row[1]);
                     if (row[0] === 'balances') meta.balances = JSON.parse(row[1]);
                     if (row[0] === 'availableYears') meta.availableYears = JSON.parse(row[1]);
                 } catch (e) { console.error('Error parsing meta', e); }
             });
 
-            // 2. Parse PaidBills to augment Housemates
+            // 1.5 Parse Housemates from Housemates Sheet
+            const splitRows = getValuesForSheet(HOUSEMATES_SHEET) || [];
+            const housemates: Housemate[] = [];
+            // Row 0 is header: Name
+            // Data starts at Row 1 (index 1) -> Sheet Row 2
+            splitRows.forEach((row: string[], index: number) => {
+                if (index === 0) return; // Skip header
+                if (row[0]) {
+                    housemates.push({
+                        id: row[0], // Name as ID for now
+                        name: row[0],
+                        email: '',
+                        avatar: '',
+                        rowIndex: index + 1 // 1-based index for sheet (Row 1 is header, so index 1 is Row 2)
+                    });
+                }
+            });
+            meta.housemates = housemates;
+
+            // 2. Parse PaidBills to augment Housemates (Legacy check, maybe not needed if BillSplits is source of truth)
             const paidBillsRows = getValuesForSheet(PAID_BILLS_SHEET) || [];
             const paidHousemates = new Set<string>();
             paidBillsRows.forEach((row: string[], index: number) => {
@@ -238,14 +260,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (row[2]) paidHousemates.add(row[2]);
             });
 
-            // Merge with existing housemates
+            // Merge with existing housemates (Only if not in BillSplits - maybe warn or add?)
+            // For now, let's assume BillSplits is authoritative. If PaidBills has someone not in BillSplits, they are "legacy" or "removed".
+            // We won't auto-add them to BillSplits to avoid clutter, but maybe we should show them?
+            // Let's stick to BillSplits as the source.
             const existingNames = new Set(meta.housemates.map(h => h.name));
-            paidHousemates.forEach(name => {
-                if (!existingNames.has(name)) {
-                    meta.housemates.push({ id: name, name, avatar: '' });
-                    existingNames.add(name);
-                }
-            });
 
             // 3. Parse BillHistories to augment Categories and Bills
             const historyRows = getValuesForSheet(BILL_HISTORIES_SHEET) || [];
@@ -459,19 +478,43 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setAccessToken(token);
     };
 
-    const addHousemate = (housemate: Housemate) => {
-        setData(prev => {
-            const newState = {
-                ...prev,
-                meta: {
-                    ...prev.meta,
-                    housemates: [...prev.meta.housemates, housemate],
-                    balances: { ...prev.meta.balances, [housemate.id]: 0 }
-                }
-            };
-            saveMeta(newState.meta);
-            return newState;
-        });
+    const addHousemate = async (housemate: Housemate) => {
+        if (!spreadsheetId) return;
+
+        // Append to Housemates
+        // Columns: Name
+        const row = [housemate.name];
+        await GoogleSheetsService.appendValues(spreadsheetId, HOUSEMATES_SHEET, [row]);
+
+        // Refresh data to get the new row index and ensure consistency
+        await loadData(spreadsheetId);
+    };
+
+    const updateHousemate = async (id: string, name: string) => {
+        if (!spreadsheetId) return;
+        const housemate = data.meta.housemates.find(h => h.id === id);
+        if (!housemate || !housemate.rowIndex) return;
+
+        // Update Housemates at specific row
+        // Range: Housemates!A{rowIndex}:A{rowIndex}
+        // Note: rowIndex is 1-based.
+        const range = `${HOUSEMATES_SHEET}!A${housemate.rowIndex}:A${housemate.rowIndex}`; // Update Name only for now
+        await GoogleSheetsService.updateValues(spreadsheetId, range, [[name]]);
+
+        await loadData(spreadsheetId);
+    };
+
+    const removeHousemate = async (id: string) => {
+        if (!spreadsheetId) return;
+        const housemate = data.meta.housemates.find(h => h.id === id);
+        if (!housemate || !housemate.rowIndex) return;
+
+        // Clear the row in Housemates
+        // Range: Housemates!A{rowIndex}:Z{rowIndex}
+        const range = `${HOUSEMATES_SHEET}!A${housemate.rowIndex}:Z${housemate.rowIndex}`;
+        await GoogleSheetsService.clearValues(spreadsheetId, range);
+
+        await loadData(spreadsheetId);
     };
 
     const value: StoreContextType = {
@@ -493,8 +536,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addHousemate,
         // Expose other actions as no-ops or implement them
         loadYear: async (_year: string) => { },
-        removeHousemate: (_id: string) => { },
-        updateHousemate: (_id: string, _name: string) => { },
+        removeHousemate,
+        updateHousemate,
         deleteBill: (_id: string) => { },
         updateBill: (_bill: BillType) => { },
         addBillCategory: (_category: BillCategory) => { },
