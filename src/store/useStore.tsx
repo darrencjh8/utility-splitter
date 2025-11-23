@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Housemate, BillType, BillCategory } from '../types';
+import { MANUAL_BILL_CATEGORIES } from '../types';
 import { GoogleSheetsService } from '../services/GoogleSheetsService';
 
-const META_SHEET = 'Metadata';
 const BILLS_SHEET = 'ManualBills';
 const PAID_BILLS_SHEET = 'PaidBills';
 const BILL_HISTORIES_SHEET = 'BillHistories';
 const BILL_STATUS_SHEET = 'BillStatus';
-const CACHE_KEY = 'white_quasar_data';
-const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const HOUSEMATES_SHEET = 'Housemates';
 
 interface StoreMeta {
     housemates: Housemate[];
@@ -26,33 +25,19 @@ interface StoreData {
 
 const initialMeta: StoreMeta = {
     housemates: [],
-    billCategories: [
-        { id: '1', name: 'Utilities', isDefault: true },
-        { id: '2', name: 'Rent', isDefault: true },
-        { id: '3', name: 'Internet', isDefault: true },
-        { id: '4', name: 'Groceries', isDefault: true },
-        { id: '5', name: 'Other', isDefault: true },
-    ],
+    billCategories: [...MANUAL_BILL_CATEGORIES],
     balances: {},
     availableYears: [new Date().getFullYear().toString()],
 };
 
-const initialData: StoreData = {
-    meta: initialMeta,
-    currentYear: new Date().getFullYear().toString(),
-    currentBills: [],
-    monthStatus: {}
-};
-
 interface StoreContextType {
     isLoading: boolean;
-    isSyncing: boolean;
     isError: boolean;
     errorType: 'API' | 'AUTH' | null;
     spreadsheetId: string | null;
     accessToken: string | null;
     housemates: Housemate[];
-    bills: BillType[];
+    billHistories: BillType[];
     billCategories: BillCategory[];
     balances: Record<string, number>;
     availableYears: string[];
@@ -61,8 +46,8 @@ interface StoreContextType {
     setSheetId: (id: string) => void;
     handleLoginSuccess: (token: string) => void;
     addBill: (bill: BillType) => Promise<void>;
+    addManualBill: (month: string, vendor: string, amounts: number[]) => Promise<void>;
     addHousemate: (housemate: Housemate) => void;
-    syncData: () => Promise<void>;
     loadYear: (year: string) => Promise<void>;
     removeHousemate: (id: string) => void;
     updateHousemate: (id: string, name: string) => void;
@@ -75,21 +60,36 @@ interface StoreContextType {
     importData: (json: string) => Promise<boolean>;
     isDarkMode: boolean;
     toggleDarkMode: () => void;
+    isSyncing: boolean;
+    syncData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
-export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
-    const [isSyncing, setIsSyncing] = useState(false);
     const [isError, setIsError] = useState(false);
     const [errorType, setErrorType] = useState<'API' | 'AUTH' | null>(null);
     const [spreadsheetId, setSpreadsheetId] = useState<string | null>(() => localStorage.getItem('spreadsheet_id'));
     const [accessToken, setAccessToken] = useState<string | null>(() => sessionStorage.getItem('google_access_token'));
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const isLoaded = useRef(false);
 
     const [data, setData] = useState<StoreData>(() => {
-        const cached = localStorage.getItem(CACHE_KEY);
-        return cached ? JSON.parse(cached) : initialData;
+        const saved = localStorage.getItem('store_data');
+        return saved ? JSON.parse(saved) : {
+            meta: initialMeta,
+            currentYear: new Date().getFullYear().toString(),
+            currentBills: [],
+            monthStatus: {}
+        };
+    });
+
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const saved = localStorage.getItem('dark_mode');
+        if (saved) return JSON.parse(saved);
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
     });
 
     // Helper to parse bills from ManualBills sheet
@@ -115,13 +115,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             id: `manual-${rowIndex}-${colIndex}-${Date.now()}`,
                             title: vendor,
                             amount: amount,
-                            payerId: name,
-                            date: month,
+                            payerId: name, // Assuming header name matches housemate ID/Name
+                            date: month, // Use month string as date for now, or parse it
                             splitMethod: 'equal',
                             splits: [],
                             createdAt: new Date().toISOString(),
                             billingMonth: month,
-                            categoryId: '5', // Default to 'Other'
+                            categoryId: vendor, // Use vendor name as category
                             type: 'bill'
                         });
                     }
@@ -137,8 +137,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Helper to parse bills from BillHistories sheet
     const parseHistoryBills = (rows: any[][]): BillType[] => {
         if (!rows || rows.length === 0) return [];
+        // Row: [Timestamp, Month, Category, Description, Amount, ?, Status, ID]
         return rows.map((row, index): BillType | null => {
             try {
+                // Skip header if present (check if Amount is number)
                 const amount = Number(row[4]);
                 if (isNaN(amount)) {
                     console.warn(`Row ${index} skipped: Invalid amount`, row);
@@ -146,13 +148,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 }
 
                 return {
-                    id: row[7] || `hist-${Math.random()}`,
-                    title: row[3],
+                    id: row[7],
+                    title: row[2],
                     amount: amount,
-                    payerId: 'SYSTEM',
+                    payerId: 'SYSTEM', // Default payer for system bills
                     date: row[0],
-                    splitMethod: 'equal',
-                    splits: [],
+                    splitMethod: 'equal', // Default
+                    splits: [], // Default
                     createdAt: row[0],
                     billingMonth: row[1],
                     categoryId: row[2],
@@ -165,6 +167,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }).filter((b): b is BillType => b !== null);
     };
 
+    // Helper to format bill to sheet row
     const formatBill = (bill: BillType): any[] => {
         return [
             bill.id,
@@ -181,75 +184,88 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ];
     };
 
-    const syncData = useCallback(async () => {
-        if (!accessToken || !spreadsheetId) return;
+    const loadData = useCallback(async (sheetId: string) => {
+        if (!GoogleSheetsService.getAccessToken()) return;
 
-        setIsSyncing(true);
+        setIsLoading(true);
         try {
-            const spreadsheet = await GoogleSheetsService.getSpreadsheet(spreadsheetId);
+            // 0. Fetch Spreadsheet Metadata to see which sheets exist
+            const spreadsheet = await GoogleSheetsService.getSpreadsheet(sheetId);
             const existingSheets = new Set(spreadsheet.sheets?.map((s: any) => s.properties.title) || []);
 
+            // Define ranges based on existence (no longer loading Metadata sheet)
             const rangesToFetch: string[] = [];
-            if (existingSheets.has(META_SHEET)) rangesToFetch.push(`${META_SHEET}!A:B`);
             if (existingSheets.has(BILLS_SHEET)) rangesToFetch.push(`${BILLS_SHEET}!A:K`);
             if (existingSheets.has(PAID_BILLS_SHEET)) rangesToFetch.push(`${PAID_BILLS_SHEET}!A:F`);
             if (existingSheets.has(BILL_HISTORIES_SHEET)) rangesToFetch.push(`${BILL_HISTORIES_SHEET}!A:H`);
             if (existingSheets.has(BILL_STATUS_SHEET)) rangesToFetch.push(`${BILL_STATUS_SHEET}!A:D`);
+            if (existingSheets.has(HOUSEMATES_SHEET)) rangesToFetch.push(`${HOUSEMATES_SHEET}!A:A`);
 
             if (rangesToFetch.length === 0) {
-                setIsSyncing(false);
+                setIsLoading(false);
                 return;
             }
 
-            const response = await GoogleSheetsService.batchGetValues(spreadsheetId, rangesToFetch);
+            const response = await GoogleSheetsService.batchGetValues(sheetId, rangesToFetch);
             const valueRanges = response.valueRanges || [];
 
+            // Helper to find values for a specific sheet
             const getValuesForSheet = (sheetName: string) => {
                 const range = valueRanges.find((r: any) => r.range.startsWith(`'${sheetName}'`) || r.range.startsWith(sheetName));
                 return range ? range.values : [];
             };
 
-            // 1. Parse Metadata
-            const metaRows = getValuesForSheet(META_SHEET) || [];
-            const meta: StoreMeta = { ...initialMeta };
-            metaRows.forEach((row: string[]) => {
-                try {
-                    if (row[0] === 'housemates') meta.housemates = JSON.parse(row[1]);
-                    if (row[0] === 'billCategories') meta.billCategories = JSON.parse(row[1]);
-                    if (row[0] === 'balances') meta.balances = JSON.parse(row[1]);
-                    if (row[0] === 'availableYears') meta.availableYears = JSON.parse(row[1]);
-                } catch (e) { console.error('Error parsing meta', e); }
-            });
-
-            // Filter out SYSTEM from categories
-            meta.billCategories = meta.billCategories.filter(c => c.name !== 'SYSTEM');
-
-            // 2. Parse PaidBills
-            const paidBillsRows = getValuesForSheet(PAID_BILLS_SHEET) || [];
-            const paidHousemates = new Set<string>();
-            paidBillsRows.forEach((row: string[], index: number) => {
-                if (index === 0) return;
-                if (row[2]) paidHousemates.add(row[2]);
-            });
-
-            const existingNames = new Set(meta.housemates.map(h => h.name));
-            paidHousemates.forEach(name => {
-                if (!existingNames.has(name)) {
-                    meta.housemates.push({ id: name, name, avatar: '' });
-                    existingNames.add(name);
+            // 1. Parse Housemates from Housemates Sheet
+            const splitRows = getValuesForSheet(HOUSEMATES_SHEET) || [];
+            const housemates: Housemate[] = [];
+            // Row 0 is header: Name
+            // Data starts at Row 1 (index 1) -> Sheet Row 2
+            splitRows.forEach((row: string[], index: number) => {
+                if (index === 0) return; // Skip header
+                if (row[0]) {
+                    housemates.push({
+                        id: row[0], // Name as ID for now
+                        name: row[0],
+                        email: '',
+                        avatar: '',
+                        rowIndex: index + 1 // 1-based index for sheet (Row 1 is header, so index 1 is Row 2)
+                    });
                 }
             });
 
-            // 3. Parse BillHistories
+            // Initialize meta with housemates and fixed categories
+            const meta: StoreMeta = {
+                housemates,
+                billCategories: [...MANUAL_BILL_CATEGORIES],
+                balances: {},
+                availableYears: []
+            };
+
+            // 2. Parse PaidBills to augment Housemates (Legacy check, maybe not needed if BillSplits is source of truth)
+            const paidBillsRows = getValuesForSheet(PAID_BILLS_SHEET) || [];
+            const paidHousemates = new Set<string>();
+            paidBillsRows.forEach((row: string[], index: number) => {
+                if (index === 0) return; // Skip header
+                if (row[2]) paidHousemates.add(row[2]);
+            });
+
+            // Merge with existing housemates (Only if not in BillSplits - maybe warn or add?)
+            // For now, let's assume BillSplits is authoritative. If PaidBills has someone not in BillSplits, they are "legacy" or "removed".
+            // We won't auto-add them to BillSplits to avoid clutter, but maybe we should show them?
+            // Let's stick to BillSplits as the source.
+            const existingNames = new Set(meta.housemates.map(h => h.name));
+
+            // 3. Parse BillHistories to augment Categories and Bills
             const historyRows = getValuesForSheet(BILL_HISTORIES_SHEET) || [];
             const historyBills = parseHistoryBills(historyRows);
 
+            // Extract categories from history
             const historyCategories = new Set<string>();
             historyBills.forEach(b => historyCategories.add(b.categoryId));
 
             const existingCategories = new Set(meta.billCategories.map(c => c.name));
             historyCategories.forEach(catName => {
-                if (catName !== 'SYSTEM' && !existingCategories.has(catName)) {
+                if (!existingCategories.has(catName)) {
                     meta.billCategories.push({ id: catName, name: catName });
                     existingCategories.add(catName);
                 }
@@ -259,6 +275,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const manualRows = getValuesForSheet(BILLS_SHEET) || [];
             const manualBills = parseManualBills(manualRows);
 
+            // Extract housemates from ManualBills headers
             if (manualRows.length > 0) {
                 const manualHeaders = manualRows[0];
                 const manualNames = manualHeaders.slice(2);
@@ -275,6 +292,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const monthStatus: Record<string, any> = {};
             statusRows.forEach((row: string[], index: number) => {
                 if (index === 0) return;
+                // Row: [Date, Status, Received, Pending]
                 monthStatus[row[0]] = {
                     status: row[1],
                     received: JSON.parse(row[2] || '[]'),
@@ -282,47 +300,60 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 };
             });
 
+            // Combine Bills
             const allBills = [...historyBills, ...manualBills];
 
+            // Helper to extract year from billingMonth (handles "October 2023", "11/1/2022", etc.)
             const getYearFromMonth = (raw: string): string => {
                 if (!raw) return '';
                 try {
                     const date = new Date(raw);
-                    if (!isNaN(date.getTime())) return date.getFullYear().toString();
+                    if (!isNaN(date.getTime())) {
+                        return date.getFullYear().toString();
+                    }
+                    // Fallback for "Month Year" if Date parsing fails (though Date usually handles it)
                     const parts = raw.split(' ');
-                    if (parts.length === 2 && !isNaN(Number(parts[1]))) return parts[1];
-                } catch (e) { }
+                    if (parts.length === 2 && !isNaN(Number(parts[1]))) {
+                        return parts[1];
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse year from month:', raw);
+                }
                 return '';
             };
 
+            // Extract available years from all bills
             const yearsSet = new Set<string>();
             allBills.forEach(b => {
                 const y = getYearFromMonth(b.billingMonth);
                 if (y) yearsSet.add(y);
             });
-            const availableYears = Array.from(yearsSet).sort().reverse();
+            const availableYears = Array.from(yearsSet).sort().reverse(); // Newest first
 
+            // Filter for current year
             const currentYear = new Date().getFullYear().toString();
+            // If currentYear is not in availableYears, default to the latest available year
             let activeYear = currentYear;
             if (availableYears.length > 0 && !availableYears.includes(activeYear)) {
                 activeYear = availableYears[0];
             }
 
             const currentBills = allBills.filter(b => getYearFromMonth(b.billingMonth) === activeYear);
-            meta.availableYears = availableYears.length > 0 ? availableYears : [currentYear];
 
-            const newData = {
+            // Update meta with available years
+            meta.availableYears = availableYears.length > 0 ? availableYears : [new Date().getFullYear().toString()];
+
+            setData({
                 meta,
                 currentYear: activeYear,
                 currentBills,
                 monthStatus
-            };
+            });
 
-            setData(newData);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
+            isLoaded.current = true;
             setIsError(false);
         } catch (e: any) {
-            console.error("Sync failed", e);
+            console.error("Load failed", e);
             setIsError(true);
             setErrorType('API');
             if (e.message === 'Unauthorized') {
@@ -330,43 +361,71 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 setAccessToken(null);
             }
         } finally {
-            setIsSyncing(false);
             setIsLoading(false);
         }
-    }, [accessToken, spreadsheetId]);
+    }, []);
 
-    // Initial load and periodic sync
+    const syncData = useCallback(async () => {
+        if (!spreadsheetId || !accessToken) return;
+        setIsSyncing(true);
+        try {
+            await loadData(spreadsheetId);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [spreadsheetId, accessToken, loadData]);
+
     useEffect(() => {
         if (accessToken && spreadsheetId) {
-            // If we have cached data, we're not "loading" in the blocking sense
-            if (data.meta.housemates.length > 0) {
+            // OPTIMIZATION: Check if we already have data in local storage
+            const hasLocalData = data.currentBills.length > 0 || data.meta.housemates.length > 0;
+
+            if (!hasLocalData) {
+                // Only fetch if local storage is empty
+                loadData(spreadsheetId);
+            } else {
+                // If we have data, just stop loading
                 setIsLoading(false);
             }
-
-            syncData(); // Initial sync
-
-            const interval = setInterval(syncData, SYNC_INTERVAL);
-            return () => clearInterval(interval);
         } else {
             setIsLoading(false);
         }
-    }, [accessToken, spreadsheetId, syncData]);
+    }, [accessToken, spreadsheetId, loadData]); // data is intentionally omitted to avoid loops, logic depends on initial state
 
-    const saveMeta = async (newMeta: StoreMeta) => {
-        if (!spreadsheetId) return;
-        const rows = [
-            ['housemates', JSON.stringify(newMeta.housemates)],
-            ['billCategories', JSON.stringify(newMeta.billCategories)],
-            ['balances', JSON.stringify(newMeta.balances)],
-            ['availableYears', JSON.stringify(newMeta.availableYears)]
-        ];
-        await GoogleSheetsService.updateValues(spreadsheetId, `${META_SHEET}!A:B`, rows);
-    };
+    // Persistence Effect
+    useEffect(() => {
+        localStorage.setItem('store_data', JSON.stringify(data));
+    }, [data]);
+
+    // Dark Mode Effect
+    useEffect(() => {
+        localStorage.setItem('dark_mode', JSON.stringify(isDarkMode));
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [isDarkMode]);
+
+    // Periodic Sync Effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (spreadsheetId && accessToken && !isSyncing) {
+                console.log('Auto-syncing...');
+                syncData();
+            }
+        }, 60000); // 60 seconds
+        return () => clearInterval(interval);
+    }, [spreadsheetId, accessToken, isSyncing, syncData]);
+
+    // Meta is now only stored in localStorage, no longer synced to sheets
+    // Removed saveMeta function as we don't write to Metadata sheet anymore
 
     const addBill = async (bill: BillType) => {
         if (!spreadsheetId) return;
 
         setData(prev => {
+            // Optimistic update
             const newBalances = { ...prev.meta.balances };
             if (newBalances[bill.payerId] === undefined) newBalances[bill.payerId] = 0;
             newBalances[bill.payerId] += bill.amount;
@@ -381,15 +440,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 : [...prev.meta.availableYears, billYear].sort();
 
             const newMeta = { ...prev.meta, balances: newBalances, availableYears: newAvailableYears };
-            const newBills = [bill, ...prev.currentBills];
-            const newData = { ...prev, meta: newMeta, currentBills: newBills };
+            // No longer saving meta to sheets
+            // saveMeta(newMeta);
 
-            localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
-            return newData;
+            return {
+                ...prev,
+                meta: newMeta,
+                currentBills: [...prev.currentBills, bill]
+            };
         });
 
-        saveMeta(data.meta); // Note: using state here might be stale, but optimistic update handles UI
-        GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [formatBill(bill)]);
+        // Write bill to sheet
+        await GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [formatBill(bill)]);
+    };
+
+    const addManualBill = async (month: string, vendor: string, amounts: number[]) => {
+        if (!spreadsheetId) return;
+
+        // Create row: [Month, Vendor, ...amounts for each housemate]
+        const row = [month, vendor, ...amounts.map(a => a.toString())];
+
+        // Append to ManualBills sheet
+        await GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [row]);
+
+        // Refresh data to get updated bills
+        await loadData(spreadsheetId);
     };
 
     const setSheetId = (id: string) => {
@@ -401,31 +476,53 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAccessToken(token);
     };
 
-    const addHousemate = (housemate: Housemate) => {
-        setData(prev => {
-            const newState = {
-                ...prev,
-                meta: {
-                    ...prev.meta,
-                    housemates: [...prev.meta.housemates, housemate],
-                    balances: { ...prev.meta.balances, [housemate.id]: 0 }
-                }
-            };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(newState));
-            saveMeta(newState.meta);
-            return newState;
-        });
+    const addHousemate = async (housemate: Housemate) => {
+        if (!spreadsheetId) return;
+
+        // Append to Housemates
+        // Columns: Name
+        const row = [housemate.name];
+        await GoogleSheetsService.appendValues(spreadsheetId, HOUSEMATES_SHEET, [row]);
+
+        // Refresh data to get the new row index and ensure consistency
+        await loadData(spreadsheetId);
+    };
+
+    const updateHousemate = async (id: string, name: string) => {
+        if (!spreadsheetId) return;
+        const housemate = data.meta.housemates.find(h => h.id === id);
+        if (!housemate || !housemate.rowIndex) return;
+
+        // Update Housemates at specific row
+        // Range: Housemates!A{rowIndex}:A{rowIndex}
+        // Note: rowIndex is 1-based.
+        const range = `${HOUSEMATES_SHEET}!A${housemate.rowIndex}:A${housemate.rowIndex}`; // Update Name only for now
+        await GoogleSheetsService.updateValues(spreadsheetId, range, [[name]]);
+
+        await loadData(spreadsheetId);
+    };
+
+    const removeHousemate = async (id: string) => {
+        if (!spreadsheetId) return;
+        const housemate = data.meta.housemates.find(h => h.id === id);
+        if (!housemate || !housemate.rowIndex) return;
+
+        // Clear the row in Housemates
+        // Range: Housemates!A{rowIndex}:Z{rowIndex}
+        const range = `${HOUSEMATES_SHEET}!A${housemate.rowIndex}:Z${housemate.rowIndex}`;
+        await GoogleSheetsService.clearValues(spreadsheetId, range);
+
+        await loadData(spreadsheetId);
     };
 
     const value: StoreContextType = {
         isLoading,
-        isSyncing,
         isError,
         errorType,
         spreadsheetId,
         accessToken,
         housemates: data.meta.housemates,
-        bills: data.currentBills,
+        billHistories: data.currentBills,
         billCategories: data.meta.billCategories,
         balances: data.meta.balances,
         availableYears: data.meta.availableYears,
@@ -434,24 +531,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSheetId,
         handleLoginSuccess,
         addBill,
+        addManualBill,
         addHousemate,
-        syncData,
-        loadYear: async () => { },
-        removeHousemate: () => { },
-        updateHousemate: () => { },
-        deleteBill: () => { },
-        updateBill: () => { },
-        addBillCategory: () => { },
-        deleteBillCategory: () => { },
-        updateBillCategory: () => { },
+        // Expose other actions as no-ops or implement them
+        loadYear: async (_year: string) => { },
+        removeHousemate,
+        updateHousemate,
+        deleteBill: (_id: string) => { },
+        updateBill: (_bill: BillType) => { },
+        addBillCategory: (_category: BillCategory) => { },
+        deleteBillCategory: (_id: string) => { },
+        updateBillCategory: (_id: string, _name: string) => { },
         exportData: async () => "",
-        importData: async () => false,
-        isDarkMode: false,
-        toggleDarkMode: () => { },
+        importData: async (_json: string) => false,
+        isDarkMode,
+        toggleDarkMode: () => setIsDarkMode((prev: boolean) => !prev),
+        isSyncing,
+        syncData,
     };
 
     return (
-        <StoreContext.Provider value={value} >
+        <StoreContext.Provider value={value}>
             {children}
         </StoreContext.Provider>
     );

@@ -27,7 +27,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onNavigat
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden pb-20 md:pb-0 md:pl-64">
                 {/* Mobile Header */}
                 <header className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between sticky top-0 z-30">
-                    <h1 className="text-xl font-bold text-slate-800 dark:text-white">FairShare</h1>
+                    <h1 className="text-xl font-bold text-slate-800 dark:text-white">Utility Splitter</h1>
                     <button
                         onClick={toggleDarkMode}
                         className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"

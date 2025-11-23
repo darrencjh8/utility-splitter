@@ -7,7 +7,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { EditBillModal } from './EditBillModal';
 
 export const HistoryPage: React.FC = () => {
-    const { bills, housemates, billCategories, availableYears, currentYear, loadYear, deleteBill, updateBill } = useStore();
+    const { billHistories, housemates, billCategories, availableYears, currentYear, loadYear, deleteBill, updateBill } = useStore();
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
     const [editBill, setEditBill] = useState<BillType | null>(null);
@@ -17,7 +17,7 @@ export const HistoryPage: React.FC = () => {
 
     const groupedBills = useMemo(() => {
         const groups: Record<string, BillType[]> = {};
-        bills.forEach(bill => {
+        billHistories.forEach(bill => {
             // Fallback for existing bills without billingMonth
             const month = bill.billingMonth || bill.date.substring(0, 7);
             if (!groups[month]) {
@@ -26,10 +26,10 @@ export const HistoryPage: React.FC = () => {
             groups[month].push(bill);
         });
         return groups;
-    }, [bills]);
+    }, [billHistories]);
 
     const sortedMonths = useMemo(() => {
-        return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a));
+        return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a)); // Descending order (newest first)
     }, [groupedBills]);
 
     const totalPages = Math.ceil(sortedMonths.length / itemsPerPage);
@@ -46,7 +46,6 @@ export const HistoryPage: React.FC = () => {
         );
     };
 
-    const getHousemateName = (id: string) => housemates.find(h => h.id === id)?.name || 'Unknown';
     const getCategoryName = (id: string) => billCategories.find(c => c.id === id)?.name || 'Other';
 
     const getMonthTotal = (month: string) => {
@@ -124,7 +123,18 @@ export const HistoryPage: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-slate-800 dark:text-white">
-                                            {format(parseISO(`${month}-01`), 'MMMM yyyy')}
+                                            {(() => {
+                                                // Check if month is in "MMMM yyyy" format already (like "October 2023")
+                                                if (month.match(/^[A-Za-z]+ \d{4}$/)) {
+                                                    return month;
+                                                }
+                                                // Otherwise try to parse as ISO format "yyyy-MM"
+                                                try {
+                                                    return format(parseISO(`${month}-01`), 'MMMM yyyy');
+                                                } catch (e) {
+                                                    return month; // Fallback to original string
+                                                }
+                                            })()}
                                         </h3>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
                                             {groupedBills[month].length} bill{groupedBills[month].length !== 1 ? 's' : ''}
@@ -181,7 +191,28 @@ export const HistoryPage: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                    {format(parseISO(bill.date), 'MMM d')} • {getCategoryName(bill.categoryId)} • Paid by {getHousemateName(bill.payerId)}
+                                                    {(() => {
+                                                        try {
+                                                            // Try to parse as ISO date
+                                                            const date = parseISO(bill.date);
+                                                            if (!isNaN(date.getTime())) {
+                                                                return format(date, 'MMM d');
+                                                            }
+                                                        } catch (e) {
+                                                            // Ignore parse errors
+                                                        }
+                                                        // Try parsing as regular date string
+                                                        try {
+                                                            const date = new Date(bill.date);
+                                                            if (!isNaN(date.getTime())) {
+                                                                return format(date, 'MMM d');
+                                                            }
+                                                        } catch (e) {
+                                                            // Ignore
+                                                        }
+                                                        // Fallback to just showing the raw date if billingMonth exists
+                                                        return bill.billingMonth || bill.date.substring(0, 10);
+                                                    })()} • {getCategoryName(bill.categoryId)}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-4">
