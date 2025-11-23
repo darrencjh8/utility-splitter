@@ -7,7 +7,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { EditBillModal } from './EditBillModal';
 
 export const HistoryPage: React.FC = () => {
-    const { bills, housemates, billCategories, availableYears, currentYear, loadYear, deleteBill, updateBill } = useStore();
+    const { billHistories, housemates, billCategories, availableYears, currentYear, loadYear, deleteBill, updateBill } = useStore();
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
     const [editBill, setEditBill] = useState<BillType | null>(null);
@@ -17,7 +17,7 @@ export const HistoryPage: React.FC = () => {
 
     const groupedBills = useMemo(() => {
         const groups: Record<string, BillType[]> = {};
-        bills.forEach(bill => {
+        billHistories.forEach(bill => {
             // Fallback for existing bills without billingMonth
             const month = bill.billingMonth || bill.date.substring(0, 7);
             if (!groups[month]) {
@@ -26,7 +26,7 @@ export const HistoryPage: React.FC = () => {
             groups[month].push(bill);
         });
         return groups;
-    }, [bills]);
+    }, [billHistories]);
 
     const sortedMonths = useMemo(() => {
         return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a));

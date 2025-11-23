@@ -16,7 +16,6 @@ export const BillCategoryManager = ({ onClose }: BillCategoryManagerProps) => {
             addBillCategory({
                 id: uuidv4(),
                 name: newCategoryName.trim(),
-                isDefault: false
             });
             setNewCategoryName('');
         }
@@ -53,17 +52,14 @@ export const BillCategoryManager = ({ onClose }: BillCategoryManagerProps) => {
                     {billCategories.map(category => (
                         <div key={category.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-700 rounded transition-colors">
                             <span className="text-slate-700 dark:text-slate-200">{category.name}</span>
-                            {!category.isDefault && (
+                            {
                                 <button
                                     onClick={() => deleteBillCategory(category.id)}
                                     className="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-sm"
                                 >
                                     Delete
                                 </button>
-                            )}
-                            {category.isDefault && (
-                                <span className="text-xs text-gray-400 dark:text-slate-500">Default</span>
-                            )}
+                            }
                         </div>
                     ))}
                 </div>

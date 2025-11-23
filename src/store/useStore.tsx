@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Housemate, BillType, BillCategory } from '../types';
+import { MANUAL_BILL_CATEGORIES } from '../types';
 import { GoogleSheetsService } from '../services/GoogleSheetsService';
 
-const META_SHEET = 'Metadata';
 const BILLS_SHEET = 'ManualBills';
 const PAID_BILLS_SHEET = 'PaidBills';
 const BILL_HISTORIES_SHEET = 'BillHistories';
@@ -25,12 +25,7 @@ interface StoreData {
 
 const initialMeta: StoreMeta = {
     housemates: [],
-    billCategories: [
-        { id: '1', name: 'Utilities', isDefault: true },
-        { id: '2', name: 'Rent', isDefault: true },
-        { id: '3', name: 'Internet', isDefault: true },
-        { id: '4', name: 'Groceries', isDefault: true },
-    ],
+    billCategories: [...MANUAL_BILL_CATEGORIES],
     balances: {},
     availableYears: [new Date().getFullYear().toString()],
 };
@@ -42,7 +37,7 @@ interface StoreContextType {
     spreadsheetId: string | null;
     accessToken: string | null;
     housemates: Housemate[];
-    bills: BillType[];
+    billHistories: BillType[];
     billCategories: BillCategory[];
     balances: Record<string, number>;
     availableYears: string[];
@@ -51,6 +46,7 @@ interface StoreContextType {
     setSheetId: (id: string) => void;
     handleLoginSuccess: (token: string) => void;
     addBill: (bill: BillType) => Promise<void>;
+    addManualBill: (month: string, vendor: string, amounts: number[]) => Promise<void>;
     addHousemate: (housemate: Housemate) => void;
     loadYear: (year: string) => Promise<void>;
     removeHousemate: (id: string) => void;
@@ -197,13 +193,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const spreadsheet = await GoogleSheetsService.getSpreadsheet(sheetId);
             const existingSheets = new Set(spreadsheet.sheets?.map((s: any) => s.properties.title) || []);
 
-            // Define ranges based on existence
+            // Define ranges based on existence (no longer loading Metadata sheet)
             const rangesToFetch: string[] = [];
-            if (existingSheets.has(META_SHEET)) rangesToFetch.push(`${META_SHEET}!A:B`);
             if (existingSheets.has(BILLS_SHEET)) rangesToFetch.push(`${BILLS_SHEET}!A:K`);
             if (existingSheets.has(PAID_BILLS_SHEET)) rangesToFetch.push(`${PAID_BILLS_SHEET}!A:F`);
             if (existingSheets.has(BILL_HISTORIES_SHEET)) rangesToFetch.push(`${BILL_HISTORIES_SHEET}!A:H`);
-            if (existingSheets.has(BILL_STATUS_SHEET)) rangesToFetch.push(`${BILL_STATUS_SHEET}!A:D`);
             if (existingSheets.has(BILL_STATUS_SHEET)) rangesToFetch.push(`${BILL_STATUS_SHEET}!A:D`);
             if (existingSheets.has(HOUSEMATES_SHEET)) rangesToFetch.push(`${HOUSEMATES_SHEET}!A:A`);
 
@@ -221,19 +215,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 return range ? range.values : [];
             };
 
-            // 1. Parse Metadata (Legacy/Manual) - Keep for other meta, but Housemates move to BillSplits
-            const metaRows = getValuesForSheet(META_SHEET) || [];
-            const meta: StoreMeta = { ...initialMeta };
-            metaRows.forEach((row: string[]) => {
-                try {
-                    // if (row[0] === 'housemates') meta.housemates = JSON.parse(row[1]); // Legacy
-                    if (row[0] === 'billCategories') meta.billCategories = JSON.parse(row[1]);
-                    if (row[0] === 'balances') meta.balances = JSON.parse(row[1]);
-                    if (row[0] === 'availableYears') meta.availableYears = JSON.parse(row[1]);
-                } catch (e) { console.error('Error parsing meta', e); }
-            });
-
-            // 1.5 Parse Housemates from Housemates Sheet
+            // 1. Parse Housemates from Housemates Sheet
             const splitRows = getValuesForSheet(HOUSEMATES_SHEET) || [];
             const housemates: Housemate[] = [];
             // Row 0 is header: Name
@@ -250,7 +232,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     });
                 }
             });
-            meta.housemates = housemates;
+
+            // Initialize meta with housemates and fixed categories
+            const meta: StoreMeta = {
+                housemates,
+                billCategories: [...MANUAL_BILL_CATEGORIES],
+                balances: {},
+                availableYears: []
+            };
 
             // 2. Parse PaidBills to augment Housemates (Legacy check, maybe not needed if BillSplits is source of truth)
             const paidBillsRows = getValuesForSheet(PAID_BILLS_SHEET) || [];
@@ -429,16 +418,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return () => clearInterval(interval);
     }, [spreadsheetId, accessToken, isSyncing, syncData]);
 
-    const saveMeta = async (newMeta: StoreMeta) => {
-        if (!spreadsheetId) return;
-        const rows = [
-            ['housemates', JSON.stringify(newMeta.housemates)],
-            ['billCategories', JSON.stringify(newMeta.billCategories)],
-            ['balances', JSON.stringify(newMeta.balances)],
-            ['availableYears', JSON.stringify(newMeta.availableYears)]
-        ];
-        await GoogleSheetsService.updateValues(spreadsheetId, `${META_SHEET}!A:B`, rows);
-    };
+    // Meta is now only stored in localStorage, no longer synced to sheets
+    // Removed saveMeta function as we don't write to Metadata sheet anymore
 
     const addBill = async (bill: BillType) => {
         if (!spreadsheetId) return;
@@ -459,14 +440,31 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 : [...prev.meta.availableYears, billYear].sort();
 
             const newMeta = { ...prev.meta, balances: newBalances, availableYears: newAvailableYears };
+            // No longer saving meta to sheets
+            // saveMeta(newMeta);
 
-            // Save to Sheets
-            saveMeta(newMeta);
-            GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [formatBill(bill)]);
-
-            const newBills = [bill, ...prev.currentBills];
-            return { ...prev, meta: newMeta, currentBills: newBills };
+            return {
+                ...prev,
+                meta: newMeta,
+                currentBills: [...prev.currentBills, bill]
+            };
         });
+
+        // Write bill to sheet
+        await GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [formatBill(bill)]);
+    };
+
+    const addManualBill = async (month: string, vendor: string, amounts: number[]) => {
+        if (!spreadsheetId) return;
+
+        // Create row: [Month, Vendor, ...amounts for each housemate]
+        const row = [month, vendor, ...amounts.map(a => a.toString())];
+
+        // Append to ManualBills sheet
+        await GoogleSheetsService.appendValues(spreadsheetId, BILLS_SHEET, [row]);
+
+        // Refresh data to get updated bills
+        await loadData(spreadsheetId);
     };
 
     const setSheetId = (id: string) => {
@@ -524,7 +522,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         spreadsheetId,
         accessToken,
         housemates: data.meta.housemates,
-        bills: data.currentBills,
+        billHistories: data.currentBills,
         billCategories: data.meta.billCategories,
         balances: data.meta.balances,
         availableYears: data.meta.availableYears,
@@ -533,6 +531,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSheetId,
         handleLoginSuccess,
         addBill,
+        addManualBill,
         addHousemate,
         // Expose other actions as no-ops or implement them
         loadYear: async (_year: string) => { },

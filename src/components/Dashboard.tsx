@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-    const { housemates, bills, billCategories, currentYear } = useStore();
+    const { housemates, billHistories, billCategories, currentYear } = useStore();
 
     const summary = useMemo(() => {
         // We only calculate expenses and payable for the CURRENT VIEW (current year)
@@ -19,7 +19,7 @@ export const Dashboard: React.FC = () => {
             .filter(c => c.name.toLowerCase() === 'rent')
             .map(c => c.id);
 
-        bills.forEach(bill => {
+        billHistories.forEach(bill => {
             if (bill.type !== 'settlement') {
                 totalExpenses += bill.amount;
 
@@ -43,7 +43,7 @@ export const Dashboard: React.FC = () => {
         });
 
         return { totalExpenses, totalExpensesExcludingRent, totalPayable };
-    }, [housemates, bills, billCategories]);
+    }, [housemates, billHistories, billCategories]);
 
     const categoryStats = useMemo(() => {
         const stats: Record<string, { total: number; count: number }> = {};
@@ -53,7 +53,7 @@ export const Dashboard: React.FC = () => {
         });
         stats['5'] = { total: 0, count: 0 };
 
-        bills.forEach(bill => {
+        billHistories.forEach(bill => {
             if (bill.type === 'settlement') return;
             const catId = bill.categoryId || '5';
             if (!stats[catId]) stats[catId] = { total: 0, count: 0 };
@@ -63,7 +63,7 @@ export const Dashboard: React.FC = () => {
         });
 
         return stats;
-    }, [bills, billCategories]);
+    }, [billHistories, billCategories]);
 
     const categoryBreakdown = useMemo(() => {
         const breakdown: Record<string, Record<string, number>> = {};
@@ -75,7 +75,7 @@ export const Dashboard: React.FC = () => {
             });
         });
 
-        bills.forEach(bill => {
+        billHistories.forEach(bill => {
             if (bill.type === 'settlement') return;
             if (breakdown[bill.payerId]) {
                 const catId = bill.categoryId || '5';
@@ -84,7 +84,7 @@ export const Dashboard: React.FC = () => {
         });
 
         return breakdown;
-    }, [housemates, bills, billCategories]);
+    }, [housemates, billHistories, billCategories]);
 
 
 
@@ -111,7 +111,7 @@ export const Dashboard: React.FC = () => {
                         <TrendingUp className="w-5 h-5" />
                         <span className="text-sm font-medium">{currentYear} Bills</span>
                     </div>
-                    <div className="text-2xl font-bold text-slate-800 dark:text-white">{bills.filter(b => b.type !== 'settlement').length}</div>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-white">{billHistories.filter(b => b.type !== 'settlement').length}</div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                     <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
@@ -121,7 +121,7 @@ export const Dashboard: React.FC = () => {
                     <div className="text-2xl font-bold text-slate-800 dark:text-white">
                         ${(() => {
                             const rentCategoryIds = billCategories.filter(c => c.name.toLowerCase() === 'rent').map(c => c.id);
-                            const nonRentBills = bills.filter(b => {
+                            const nonRentBills = billHistories.filter(b => {
                                 if (b.type === 'settlement') return false;
                                 const isRent = rentCategoryIds.includes(b.categoryId) ||
                                     b.categoryId?.toLowerCase() === 'rent' ||
@@ -139,10 +139,10 @@ export const Dashboard: React.FC = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
                 <div className="space-y-3">
-                    {bills.length === 0 ? (
+                    {billHistories.length === 0 ? (
                         <p className="text-slate-400 italic">No bills recorded yet.</p>
                     ) : (
-                        bills.slice(0, 5).map(bill => (
+                        billHistories.slice(0, 5).map(bill => (
                             <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
                                 <div>
                                     <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
@@ -207,7 +207,7 @@ export const Dashboard: React.FC = () => {
                         );
                     })}
                     {housemates.every(h => Object.values(categoryBreakdown[h.id] || {}).reduce((sum, amt) => sum + amt, 0) === 0) &&
-                        bills.filter(b => b.type !== 'settlement').length === 0 && (
+                        billHistories.filter(b => b.type !== 'settlement').length === 0 && (
                             <p className="text-slate-400 italic text-center py-4">No expenses recorded yet.</p>
                         )}
                 </div>

@@ -104,7 +104,6 @@ export const LoginScreen = ({ onLoginSuccess, onSpreadsheetIdSubmit, initialToke
                         onClick={() => login()}
                         className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                     >
-                        <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 bg-white rounded-full" />
                         Sign in with Google
                     </button>
                 </div>

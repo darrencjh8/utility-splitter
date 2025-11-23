@@ -18,8 +18,15 @@ export interface Split {
 export interface BillCategory {
     id: string;
     name: string;
-    isDefault?: boolean;
 }
+
+// Fixed categories for ManualBills
+export const MANUAL_BILL_CATEGORIES = [
+    { id: 'household-item', name: 'Household Item' },
+    { id: 'aircon-service', name: 'Aircon Service' },
+    { id: 'moving-cost', name: 'Moving Cost' },
+    { id: 'others', name: 'Others' }
+] as const;
 
 export interface BillType {
     id: string;

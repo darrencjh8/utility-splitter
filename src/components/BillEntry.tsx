@@ -1,61 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
-import { DollarSign, Calendar, Receipt, Users, PieChart, Hash, Tag } from 'lucide-react';
+import { DollarSign, Calendar, Users, PieChart, Hash, Tag } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { BillCategoryManager } from './BillCategoryManager';
+import { MANUAL_BILL_CATEGORIES } from '../types';
 import type { SplitMethod, Split } from '../types';
 
 export const BillEntry: React.FC = () => {
-    const { housemates, addBill, billCategories, bills } = useStore();
+    const { housemates, addManualBill } = useStore();
 
-    const [title, setTitle] = useState('');
     const [amount, setAmount] = useState('');
-    const [payerId, setPayerId] = useState('');
-    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM'));
     const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
     const [splits, setSplits] = useState<Split[]>([]);
     const [categoryId, setCategoryId] = useState('');
-    const [showCategoryManager, setShowCategoryManager] = useState(false);
 
     // Initialize splits when housemates change
     useEffect(() => {
         if (housemates.length > 0) {
-            // Only reset if we don't have existing splits or if the housemates count changed significantly
-            // But for now, let's keep the original logic but be careful not to overwrite if we are just switching methods
             if (splits.length === 0) {
                 setSplits(housemates.map(h => ({ housemateId: h.id, amount: 0, share: splitMethod === 'equal' ? 1 : 0 })));
             }
-            if (!payerId) setPayerId(housemates[0].id);
         }
-        if (billCategories.length > 0 && !categoryId) {
-            setCategoryId(billCategories[0].id);
+        if (MANUAL_BILL_CATEGORIES.length > 0 && !categoryId) {
+            setCategoryId(MANUAL_BILL_CATEGORIES[0].id);
         }
-    }, [housemates, billCategories, categoryId, payerId, splitMethod, splits.length]);
-
-    // Auto-fill splits from previous bill of same category
-    useEffect(() => {
-        if (!categoryId || !splitMethod || splitMethod === 'equal') return;
-
-        // Find the most recent bill with this category and split method
-        const lastBill = bills
-            .filter(b => b.categoryId === categoryId && b.splitMethod === splitMethod)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
-        if (lastBill) {
-            // Map the saved splits to the current housemates
-            // We need to be careful if housemates have changed since the last bill
-            const newSplits = housemates.map(h => {
-                const savedSplit = lastBill.splits.find(s => s.housemateId === h.id);
-                return {
-                    housemateId: h.id,
-                    amount: 0, // Will be recalculated
-                    share: savedSplit ? savedSplit.share : 0
-                };
-            });
-            setSplits(newSplits);
-        }
-    }, [categoryId, splitMethod, housemates, bills]);
+    }, [housemates, categoryId, splitMethod, splits.length]);
 
     // Recalculate amounts when total amount or shares change
     useEffect(() => {
@@ -85,27 +54,24 @@ export const BillEntry: React.FC = () => {
         setSplits(prev => prev.map(s => s.housemateId === id ? { ...s, share: value } : s));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !amount || !payerId || !categoryId) return;
+        if (!amount || !categoryId) return;
 
-        addBill({
-            id: uuidv4(),
-            title,
-            amount: parseFloat(amount),
-            payerId,
-            date,
-            splitMethod,
-            splits,
-            createdAt: new Date().toISOString(),
-            billingMonth: date.substring(0, 7), // YYYY-MM
-            categoryId,
+        // Get the vendor name from the selected category
+        const vendor = MANUAL_BILL_CATEGORIES.find(c => c.id === categoryId)?.name || 'Other';
+
+        // Create array of amounts in the order of housemates
+        const amounts = housemates.map(h => {
+            const split = splits.find(s => s.housemateId === h.id);
+            return split ? split.amount : 0;
         });
 
+        await addManualBill(date, vendor, amounts);
+
         // Reset form
-        setTitle('');
         setAmount('');
-        // Keep payer, date, and category for convenience
+        // Keep date and category for convenience
     };
 
     if (housemates.length === 0) {
@@ -120,23 +86,12 @@ export const BillEntry: React.FC = () => {
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
             <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <Tag className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Add New Bill
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Bill Title</label>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g. March Electricity"
-                            className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder-slate-400 dark:placeholder-slate-500"
-                            required
-                        />
-                    </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Amount</label>
                         <div className="relative">
@@ -153,66 +108,39 @@ export const BillEntry: React.FC = () => {
                             />
                         </div>
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                                <select
-                                    value={categoryId}
-                                    onChange={(e) => setCategoryId(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                >
-                                    {billCategories.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowCategoryManager(true)}
-                                className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 text-sm"
-                                title="Manage categories"
-                            >
-                                ⚙️
-                            </button>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Paid By</label>
-                        <select
-                            value={payerId}
-                            onChange={(e) => setPayerId(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        >
-                            {housemates.map(h => (
-                                <option key={h.id} value={h.id}>{h.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Category (Vendor)</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            <input
-                                type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all [color-scheme:light] dark:[color-scheme:dark]"
-                                required
-                            />
+                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            <select
+                                value={categoryId}
+                                onChange={(e) => setCategoryId(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            >
+                                {MANUAL_BILL_CATEGORIES.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Split Method</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Month</label>
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        <input
+                            type="month"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all [color-scheme:light] dark:[color-scheme:dark]"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Split Calculator</label>
                     <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-700 rounded-xl w-fit transition-colors">
                         {(['equal', 'percentage', 'shares'] as SplitMethod[]).map((method) => (
                             <button
@@ -270,10 +198,6 @@ export const BillEntry: React.FC = () => {
                     Record Bill
                 </button>
             </form>
-
-            {showCategoryManager && (
-                <BillCategoryManager onClose={() => setShowCategoryManager(false)} />
-            )}
         </div>
     );
 };
