@@ -1,29 +1,36 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
-import { ConfirmDialog } from './ConfirmDialog';
 
 export const Dashboard: React.FC = () => {
-    const { housemates, bills, billCategories, addBill, balances: globalBalances, currentYear } = useStore();
-    const [settleDialog, setSettleDialog] = useState<{ isOpen: boolean; from: string; to: string; amount: number }>({
-        isOpen: false,
-        from: '',
-        to: '',
-        amount: 0
-    });
+    const { housemates, bills, billCategories, currentYear, balances: globalBalances } = useStore();
 
     const summary = useMemo(() => {
         // We only calculate expenses and payable for the CURRENT VIEW (current year)
         const totalPayable: Record<string, number> = {};
         let totalExpenses = 0;
+        let totalExpensesExcludingRent = 0;
 
         housemates.forEach(h => {
             totalPayable[h.id] = 0;
         });
 
+        const rentCategoryIds = billCategories
+            .filter(c => c.name.toLowerCase() === 'rent')
+            .map(c => c.id);
+
         bills.forEach(bill => {
             if (bill.type !== 'settlement') {
                 totalExpenses += bill.amount;
+
+                // Check if bill is Rent (by category ID, category name, or title)
+                const isRent = rentCategoryIds.includes(bill.categoryId) ||
+                    bill.categoryId.toLowerCase() === 'rent' ||
+                    bill.title.toLowerCase() === 'rent';
+
+                if (!isRent) {
+                    totalExpensesExcludingRent += bill.amount;
+                }
             }
 
             bill.splits.forEach(split => {
@@ -35,42 +42,8 @@ export const Dashboard: React.FC = () => {
             });
         });
 
-        return { totalExpenses, totalPayable };
-    }, [housemates, bills]);
-
-    const debts = useMemo(() => {
-        // Use GLOBAL balances for debts
-        const debtors: { id: string; amount: number }[] = [];
-        const creditors: { id: string; amount: number }[] = [];
-
-        Object.entries(globalBalances).forEach(([id, balance]) => {
-            if (balance < -0.01) debtors.push({ id, amount: -balance });
-            if (balance > 0.01) creditors.push({ id, amount: balance });
-        });
-
-        debtors.sort((a, b) => b.amount - a.amount);
-        creditors.sort((a, b) => b.amount - a.amount);
-
-        const transactions: { from: string; to: string; amount: number }[] = [];
-        let i = 0;
-        let j = 0;
-
-        while (i < debtors.length && j < creditors.length) {
-            const debtor = debtors[i];
-            const creditor = creditors[j];
-            const amount = Math.min(debtor.amount, creditor.amount);
-
-            transactions.push({ from: debtor.id, to: creditor.id, amount });
-
-            debtor.amount -= amount;
-            creditor.amount -= amount;
-
-            if (debtor.amount < 0.01) i++;
-            if (creditor.amount < 0.01) j++;
-        }
-
-        return transactions;
-    }, [globalBalances]);
+        return { totalExpenses, totalExpensesExcludingRent, totalPayable };
+    }, [housemates, bills, billCategories]);
 
     const categoryStats = useMemo(() => {
         const stats: Record<string, { total: number; count: number }> = {};
@@ -115,63 +88,44 @@ export const Dashboard: React.FC = () => {
 
     const getHousemateName = (id: string) => housemates.find(h => h.id === id)?.name || 'Unknown';
 
-    const handleSettleClick = (fromId: string, toId: string, amount: number) => {
-        setSettleDialog({
-            isOpen: true,
-            from: fromId,
-            to: toId,
-            amount: amount
-        });
-    };
-
-    const handleConfirmSettle = () => {
-        addBill({
-            id: crypto.randomUUID(),
-            title: 'Settlement',
-            amount: settleDialog.amount,
-            payerId: settleDialog.from,
-            date: new Date().toISOString(),
-            splitMethod: 'exact',
-            splits: [{ housemateId: settleDialog.to, amount: settleDialog.amount }],
-            createdAt: new Date().toISOString(),
-            billingMonth: new Date().toISOString().slice(0, 7),
-            categoryId: '5', // Other
-            type: 'settlement'
-        });
-        setSettleDialog({ isOpen: false, from: '', to: '', amount: 0 });
-    };
-
     return (
         <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-500/20">
                     <div className="flex items-center gap-3 mb-2 opacity-80">
                         <Wallet className="w-5 h-5" />
-                        <span className="text-sm font-medium">{currentYear} Expenses</span>
+                        <span className="text-sm font-medium">{currentYear} Total</span>
                     </div>
-                    <div className="text-3xl font-bold">${summary.totalExpenses.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">${summary.totalExpenses.toFixed(2)}</div>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
+                    <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
+                        <Wallet className="w-5 h-5" />
+                        <span className="text-sm font-medium">Excl. Rent</span>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-white">${summary.totalExpensesExcludingRent.toFixed(2)}</div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                     <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
                         <TrendingUp className="w-5 h-5" />
                         <span className="text-sm font-medium">{currentYear} Bills</span>
                     </div>
-                    <div className="text-3xl font-bold text-slate-800 dark:text-white">{bills.filter(b => b.type !== 'settlement').length}</div>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-white">{bills.filter(b => b.type !== 'settlement').length}</div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                     <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
                         <DollarSign className="w-5 h-5" />
                         <span className="text-sm font-medium">Avg. per Bill</span>
                     </div>
-                    <div className="text-3xl font-bold text-slate-800 dark:text-white">
+                    <div className="text-2xl font-bold text-slate-800 dark:text-white">
                         ${bills.filter(b => b.type !== 'settlement').length > 0 ? (summary.totalExpenses / bills.filter(b => b.type !== 'settlement').length).toFixed(2) : '0.00'}
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Balances */}
+                {/* Net Balances */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Net Balances (Global)</h3>
                     <div className="space-y-3">
@@ -197,33 +151,27 @@ export const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Who Owes Who */}
+                {/* Recent Bills */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Settlement Plan</h3>
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
                     <div className="space-y-3">
-                        {debts.length > 0 ? (
-                            debts.map((debt, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl transition-colors">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium text-slate-700 dark:text-slate-200">{getHousemateName(debt.from)}</span>
-                                        <span className="text-slate-400 text-xs">owes</span>
-                                        <span className="font-medium text-slate-700 dark:text-slate-200">{getHousemateName(debt.to)}</span>
+                        {bills.length === 0 ? (
+                            <p className="text-slate-400 italic">No bills recorded yet.</p>
+                        ) : (
+                            bills.slice(0, 5).map(bill => (
+                                <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
+                                    <div>
+                                        <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                                            Paid by {getHousemateName(bill.payerId)} • {new Date(bill.date).toLocaleDateString()}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-bold text-slate-800 dark:text-white">${debt.amount.toFixed(2)}</span>
-                                        <button
-                                            onClick={() => handleSettleClick(debt.from, debt.to, debt.amount)}
-                                            className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-                                        >
-                                            Settle
-                                        </button>
+                                    <div className="text-right">
+                                        <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
                                     </div>
                                 </div>
                             ))
-                        ) : (
-                            <div className="text-center py-8 text-slate-400">
-                                <p>All settled up! 🎉</p>
-                            </div>
                         )}
                     </div>
                 </div>
@@ -280,40 +228,6 @@ export const Dashboard: React.FC = () => {
                     )}
                 </div>
             </div>
-
-            {/* Recent Bills */}
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
-                <div className="space-y-3">
-                    {bills.length === 0 ? (
-                        <p className="text-slate-400 italic">No bills recorded yet.</p>
-                    ) : (
-                        bills.slice(0, 5).map(bill => (
-                            <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
-                                <div>
-                                    <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                                        Paid by {getHousemateName(bill.payerId)} • {new Date(bill.date).toLocaleDateString()}
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-
-            <ConfirmDialog
-                isOpen={settleDialog.isOpen}
-                title="Confirm Settlement"
-                message={`Record settlement of $${settleDialog.amount.toFixed(2)} from ${getHousemateName(settleDialog.from)} to ${getHousemateName(settleDialog.to)}?`}
-                confirmLabel="Settle"
-                onConfirm={handleConfirmSettle}
-                onCancel={() => setSettleDialog({ isOpen: false, from: '', to: '', amount: 0 })}
-            />
         </div>
     );
 };

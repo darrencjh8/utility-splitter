@@ -33,9 +33,9 @@ const basicAuth = (req, res, next) => {
 };
 
 const tenantMiddleware = (req, res, next) => {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.query.tenantId || req.body.tenantId;
     if (!tenantId) {
-        return res.status(400).json({ error: 'X-Tenant-ID header required' });
+        return res.status(400).json({ error: 'tenantId required in query or body' });
     }
     // Validate tenantId (alphanumeric and dashes only)
     if (!/^[a-zA-Z0-9-]+$/.test(tenantId)) {

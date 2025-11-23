@@ -9,13 +9,12 @@ A web application for tracking and splitting monthly utility bills among housema
 
 # Future Improvements
 
-- All data should be protected by encryption key
-- Add OCR through Make.io
-- Add API that accepts request from Make.io
+- TenantID should be changed to email which can be extracted by Parseur
+- Implement automation workflow using Parseur and Google Sheet
+- Input field for a google oauth2 in the frontend, to pull data from google sheet
+- Extract data from this sheet to display in the frontend
+- PUT API has to manage conflict management between user input data or data input by automation workflow
 - Protect API with basic auth
-- Add contact method for housemates
-    - Email
-- Integrate with sendgrid to send out emails
 
 
 ## Prerequisites

@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:client": "node scripts/generate-client.js",
+    "test:e2e": "powershell -ExecutionPolicy Bypass -File ./run-e2e.ps1"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.12.2",
     "autoprefixer": "^10.4.18",
     "clsx": "^2.1.1",
     "date-fns": "^3.3.1",
@@ -22,6 +25,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20.11.24",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
@@ -30,6 +34,8 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "js-yaml": "^4.1.1",
+    "openapi-typescript-codegen": "^0.27.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.4"
   }
