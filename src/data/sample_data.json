@@ -1,0 +1,255 @@
+{
+    "meta": {
+        "housemates": [
+            {
+                "id": "WaiHong",
+                "name": "WaiHong",
+                "email": "",
+                "avatar": "",
+                "rowIndex": 2
+            },
+            {
+                "id": "Darren",
+                "name": "Darren",
+                "email": "",
+                "avatar": "",
+                "rowIndex": 3
+            },
+            {
+                "id": "YonTing",
+                "name": "YonTing",
+                "avatar": ""
+            }
+        ],
+        "billCategories": [
+            {
+                "id": "household-item",
+                "name": "Household Item"
+            },
+            {
+                "id": "aircon-service",
+                "name": "Aircon Service"
+            },
+            {
+                "id": "moving-cost",
+                "name": "Moving Cost"
+            },
+            {
+                "id": "others",
+                "name": "Others"
+            },
+            {
+                "id": "Senoko Energy",
+                "name": "Senoko Energy"
+            },
+            {
+                "id": "Rent",
+                "name": "Rent"
+            },
+            {
+                "id": "Internet",
+                "name": "Internet"
+            },
+            {
+                "id": "SP Digital",
+                "name": "SP Digital"
+            },
+            {
+                "id": "SYSTEM",
+                "name": "SYSTEM"
+            }
+        ],
+        "balances": {},
+        "availableYears": [
+            "2025",
+            "2024",
+            "2023",
+            "2022"
+        ]
+    },
+    "currentYear": "2025",
+    "currentBills": [
+        {
+            "id": "1946b28debd750b4",
+            "title": "SP Digital",
+            "amount": 43.47,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "January 2025",
+            "categoryId": "SP Digital",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Rent-January 2025",
+            "title": "Rent",
+            "amount": 3000,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:29",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:29",
+            "billingMonth": "January 2025",
+            "categoryId": "Rent",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Internet-January 2025",
+            "title": "Internet",
+            "amount": 32.69,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:29",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:29",
+            "billingMonth": "January 2025",
+            "categoryId": "Internet",
+            "type": "bill"
+        },
+        {
+            "id": "195294f24faf9309",
+            "title": "Senoko Energy",
+            "amount": 122.13,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "February 2025",
+            "categoryId": "Senoko Energy",
+            "type": "bill"
+        },
+        {
+            "id": "1951a96873abe028",
+            "title": "SP Digital",
+            "amount": 49.88,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "February 2025",
+            "categoryId": "SP Digital",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Rent-February 2025",
+            "title": "Rent",
+            "amount": 3000,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:28",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:28",
+            "billingMonth": "2/1/2025",
+            "categoryId": "Rent",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Internet-February 2025",
+            "title": "Internet",
+            "amount": 32.69,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:28",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:28",
+            "billingMonth": "February 2025",
+            "categoryId": "Internet",
+            "type": "bill"
+        },
+        {
+            "id": "SENT-February 2025",
+            "title": "SYSTEM",
+            "amount": 0,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:29",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:29",
+            "billingMonth": "February 2025",
+            "categoryId": "SYSTEM",
+            "type": "bill"
+        },
+        {
+            "id": "195b85e620aaea32",
+            "title": "Senoko Energy",
+            "amount": 146.68,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "March 2025",
+            "categoryId": "Senoko Energy",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Rent-March 2025",
+            "title": "Rent",
+            "amount": 3000,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:28",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:28",
+            "billingMonth": "March 2025",
+            "categoryId": "Rent",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Internet-March 2025",
+            "title": "Internet",
+            "amount": 32.69,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:28",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:28",
+            "billingMonth": "March 2025",
+            "categoryId": "Internet",
+            "type": "bill"
+        },
+        {
+            "id": "196674829c8f47cb",
+            "title": "Senoko Energy",
+            "amount": 150.46,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "April 2025",
+            "categoryId": "Senoko Energy",
+            "type": "bill"
+        },
+        {
+            "id": "1964a2fc83049410",
+            "title": "SP Digital",
+            "amount": 51.58,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:19:47",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:19:47",
+            "billingMonth": "April 2025",
+            "categoryId": "SP Digital",
+            "type": "bill"
+        },
+        {
+            "id": "FIXED-Rent-April 2025",
+            "title": "Rent",
+            "amount": 3000,
+            "payerId": "SYSTEM",
+            "date": "11/23/2025 17:20:27",
+            "splitMethod": "equal",
+            "splits": [],
+            "createdAt": "11/23/2025 17:20:27",
+            "billingMonth": "April 2025",
+            "categoryId": "Rent",
+            "type": "bill"
+        }
+    ]
+}

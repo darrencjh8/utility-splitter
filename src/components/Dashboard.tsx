@@ -49,13 +49,21 @@ export const Dashboard: React.FC = () => {
         const stats: Record<string, { total: number; count: number }> = {};
 
         billCategories.forEach(cat => {
-            stats[cat.id] = { total: 0, count: 0 };
+            if (cat.name.toUpperCase() !== 'SYSTEM') {
+                stats[cat.id] = { total: 0, count: 0 };
+            }
         });
         stats['5'] = { total: 0, count: 0 };
 
         billHistories.forEach(bill => {
             if (bill.type === 'settlement') return;
             const catId = bill.categoryId || '5';
+
+            // Explicitly exclude SYSTEM category (by ID or Name)
+            // Check if the category ID corresponds to "SYSTEM" or if the ID itself is "SYSTEM"
+            const category = billCategories.find(c => c.id === catId);
+            if (catId === 'SYSTEM' || (category && category.name.toUpperCase() === 'SYSTEM')) return;
+
             if (!stats[catId]) stats[catId] = { total: 0, count: 0 };
 
             stats[catId].total += bill.amount;
@@ -71,7 +79,9 @@ export const Dashboard: React.FC = () => {
         housemates.forEach(h => {
             breakdown[h.id] = {};
             billCategories.forEach(cat => {
-                breakdown[h.id][cat.id] = 0;
+                if (cat.name.toUpperCase() !== 'SYSTEM') {
+                    breakdown[h.id][cat.id] = 0;
+                }
             });
         });
 

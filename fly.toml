@@ -1,15 +1,11 @@
-# fly.toml app configuration file generated for utility-splitter on 2024-03-20
-
 app = "utility-splitter"
-primary_region = "sin" # Singapore, change as needed
+primary_region = "sin"
 
 [build]
   dockerfile = "Dockerfile.fly"
 
 [env]
   PORT = "3000"
-
-
 
 [http_service]
   internal_port = 80
@@ -21,3 +17,6 @@ primary_region = "sin" # Singapore, change as needed
 
 [[vm]]
   size = "shared-cpu-1x"
+  cpu_kind = "shared"
+  memory_mb = 256
+  cpus = 1

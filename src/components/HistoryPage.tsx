@@ -18,18 +18,79 @@ export const HistoryPage: React.FC = () => {
     const groupedBills = useMemo(() => {
         const groups: Record<string, BillType[]> = {};
         billHistories.forEach(bill => {
-            // Fallback for existing bills without billingMonth
-            const month = bill.billingMonth || bill.date.substring(0, 7);
-            if (!groups[month]) {
-                groups[month] = [];
+            // Normalize month to YYYY-MM format for consistent grouping and sorting
+            let monthKey = '';
+
+            // Try to parse billingMonth first
+            if (bill.billingMonth) {
+                // Check if it's already YYYY-MM
+                if (bill.billingMonth.match(/^\d{4}-\d{2}$/)) {
+                    monthKey = bill.billingMonth;
+                }
+                // Check if it's "Month Year" (e.g., "January 2025")
+                else if (bill.billingMonth.match(/^[A-Za-z]+ \d{4}$/)) {
+                    try {
+                        const date = new Date(bill.billingMonth);
+                        if (!isNaN(date.getTime())) {
+                            monthKey = format(date, 'yyyy-MM');
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+                // Check if it's "M/D/YYYY" (e.g., "2/1/2025")
+                else if (bill.billingMonth.includes('/')) {
+                    try {
+                        const date = new Date(bill.billingMonth);
+                        if (!isNaN(date.getTime())) {
+                            monthKey = format(date, 'yyyy-MM');
+                        }
+                    } catch (e) { /* ignore */ }
+                }
             }
-            groups[month].push(bill);
+
+            // Fallback to date field if billingMonth parsing failed
+            if (!monthKey && bill.date) {
+                try {
+                    // Try ISO
+                    const date = parseISO(bill.date);
+                    if (!isNaN(date.getTime())) {
+                        monthKey = format(date, 'yyyy-MM');
+                    } else {
+                        // Try regular Date parse
+                        const date2 = new Date(bill.date);
+                        if (!isNaN(date2.getTime())) {
+                            monthKey = format(date2, 'yyyy-MM');
+                        }
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            // Final fallback
+            if (!monthKey) {
+                monthKey = 'Unknown';
+            }
+
+            if (!groups[monthKey]) {
+                groups[monthKey] = [];
+            }
+            groups[monthKey].push(bill);
         });
         return groups;
     }, [billHistories]);
 
     const sortedMonths = useMemo(() => {
-        return Object.keys(groupedBills).sort((a, b) => b.localeCompare(a)); // Descending order (newest first)
+        return Object.keys(groupedBills).sort((a, b) => {
+            // Helper to parse month string to timestamp for comparison
+            const getTime = (m: string) => {
+                // Try "Month Year" format
+                const date1 = new Date(m);
+                if (!isNaN(date1.getTime())) return date1.getTime();
+                // Try "YYYY-MM" format
+                const date2 = parseISO(`${m}-01`);
+                if (!isNaN(date2.getTime())) return date2.getTime();
+                return 0;
+            };
+            return getTime(b) - getTime(a);
+        }); // Descending order (newest first)
     }, [groupedBills]);
 
     const totalPages = Math.ceil(sortedMonths.length / itemsPerPage);

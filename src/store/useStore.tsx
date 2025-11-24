@@ -184,10 +184,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ];
     };
 
-    const loadData = useCallback(async (sheetId: string) => {
+    const loadData = useCallback(async (sheetId: string, silent: boolean = false) => {
         if (!GoogleSheetsService.getAccessToken()) return;
 
-        setIsLoading(true);
+        if (!silent) setIsLoading(true);
         try {
             // 0. Fetch Spreadsheet Metadata to see which sheets exist
             const spreadsheet = await GoogleSheetsService.getSpreadsheet(sheetId);
@@ -369,7 +369,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (!spreadsheetId || !accessToken) return;
         setIsSyncing(true);
         try {
-            await loadData(spreadsheetId);
+            await loadData(spreadsheetId, true);
         } finally {
             setIsSyncing(false);
         }

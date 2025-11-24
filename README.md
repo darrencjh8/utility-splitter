@@ -47,9 +47,7 @@ Before you can fully utilize the application's backend functionalities, you need
 
 # Known issues
 
-- History page not sorted by month
 - Update App manifest icon to allow for more white spaces
-- Full page reload spinner when sync happens
 - Manually backfill history for the past 12 months
 
 # Future Improvements
