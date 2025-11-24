@@ -45,6 +45,37 @@ graph TD
 
 Before you can fully utilize the application's backend functionalities, you need to set up the Google Apps Script as detailed in the [`gAppScripts/Readme.md`](gAppScripts/Readme.md) file. This involves configuring the script to interact with your Google Sheets for data storage and processing.
 
+### 2. Setup Service Account
+
+To enable persistent login, you need to create a Google Service Account.
+
+1.  **Create Service Account:**
+    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    *   Select your project.
+    *   Navigate to **IAM & Admin** > **Service Accounts**.
+    *   Click **Create Service Account**.
+    *   Name it (e.g., `utility-app`) and click **Create and Continue**.
+
+2.  **Generate Key:**
+    *   Click on the newly created service account (email address).
+    *   Go to the **Keys** tab.
+    *   Click **Add Key** > **Create new key**.
+    *   Select **JSON** and click **Create**.
+    *   The key file will download to your computer.
+
+3.  **Share Sheet (Crucial):**
+    *   Copy the **email address** of the service account (e.g., `utility-app@project-id.iam.gserviceaccount.com`).
+    *   Open your Google Sheet.
+    *   Click **Share** and paste the email address.
+    *   **Permission:** You must grant **Editor** access.
+        *   *Why?* The app needs to **write** data to your sheet (adding bills, updating splits, and saving the AppConfig key). If you only grant "Viewer", the app will not work.
+
+4.  **Configure App:**
+    *   Log in to the app with Google.
+    *   Follow the prompt to check the `AppConfig` sheet.
+    *   Open the downloaded JSON key file with a text editor, copy the entire content, and paste it into cell **A2** of the `AppConfig` sheet.
+    *   Set a PIN in the app to secure your session.
+
 # Known issues
 
 - Update App manifest icon to allow for more white spaces
