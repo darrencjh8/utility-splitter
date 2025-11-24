@@ -78,12 +78,8 @@ To enable persistent login, you need to create a Google Service Account.
 
 # Known issues
 
-- Update App manifest icon to allow for more white spaces
-- Manually backfill history for the past 12 months
 
 # Future Improvements
-- Use a better icon
-- PUT API to add data into overrideBills
 - Warning for any sorts of bills that are added after a november bill are fully processed, by checking BillStatus Sheet
 - On initial load, only load a maximum of 10 years, while periodic sync only sync the current month, unless a manual sync is triggered
 - Track payment status from housemate, how much is owed
@@ -91,7 +87,6 @@ To enable persistent login, you need to create a Google Service Account.
     - track by bill + rent, or bill, rent separately from housemate name
     - across different banks paynow email template, UOB DBS and OCBC
 - Automatically sends reminder email when a housemate did not pay
-- Regex management, read the mail regex from Sheet instead of hardcoding
 
 
 ## Prerequisites

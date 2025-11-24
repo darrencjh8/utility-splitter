@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { HousemateManager } from './components/HousemateManager';
@@ -20,6 +20,20 @@ function App() {
     setSheetId,
     handleLoginSuccess
   } = useStore();
+
+  // Auto-retry logic for connection errors
+  useEffect(() => {
+    if (isError) {
+      const hasRetried = sessionStorage.getItem('retry_attempted');
+      if (!hasRetried) {
+        sessionStorage.setItem('retry_attempted', 'true');
+        window.location.reload();
+      }
+    } else if (accessToken && spreadsheetId && !isLoading) {
+      // Successful session, clear the retry flag
+      sessionStorage.removeItem('retry_attempted');
+    }
+  }, [isError, accessToken, spreadsheetId, isLoading]);
 
   const renderView = () => {
     switch (currentView) {

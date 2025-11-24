@@ -414,7 +414,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 console.log('Auto-syncing...');
                 syncData();
             }
-        }, 60000); // 60 seconds
+        }, 60000 * 10); // 10 minutes
         return () => clearInterval(interval);
     }, [spreadsheetId, accessToken, isSyncing, syncData]);
 
