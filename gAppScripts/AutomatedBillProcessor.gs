@@ -56,6 +56,9 @@ function processMonthlyBills() {
 
   // 2. Process Pending Months
   processPendingMonths(sheets, expectedVendors);
+
+  // 3. Check for Overdue Bills
+  checkOverdueBills(sheets);
 }
 
 /**
@@ -209,6 +212,38 @@ function processPendingMonths(sheets, expectedVendors) {
       
     } else {
       console.log(`Pending ${month}: Waiting for ${missing.join(", ")}`);
+    }
+  }
+}
+
+function checkOverdueBills(sheets) {
+  const today = new Date();
+  if (today.getDate() < 28) return;
+
+  const currentMonth = formatMonth(today);
+  
+  // Prevent spamming: Check if we already alerted for this month
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const alertedKey = `ALERT_SENT_${currentMonth}`;
+  if (scriptProperties.getProperty(alertedKey)) return;
+
+  const statusSheet = sheets.status;
+  const data = statusSheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    const rowMonth = formatMonth(data[i][0]);
+    const status = data[i][1];
+
+    if (rowMonth === currentMonth && status === 'Pending') {
+       GmailApp.sendEmail(
+         'chongjinheng@gmail.com',
+         `Action Required: Bills Not Processed for ${currentMonth}`,
+         `Hi,\n\nIt is the 28th (or later) of the month and the bills for ${currentMonth} are still Pending.\n\nPlease check the tracker.`
+       );
+       console.log(`Overdue alert sent for ${currentMonth}`);
+       
+       // Mark as alerted to avoid sending multiple emails
+       scriptProperties.setProperty(alertedKey, 'true');
     }
   }
 }
