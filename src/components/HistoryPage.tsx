@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { format, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, ChevronDown, ChevronUp, Trash2, Edit2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, ChevronDown, ChevronUp, Trash2, Edit2, Mail } from 'lucide-react';
 import type { BillType } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EditBillModal } from './EditBillModal';
@@ -13,7 +13,7 @@ export const HistoryPage: React.FC = () => {
     const [editBill, setEditBill] = useState<BillType | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const itemsPerPage = 5;
+    const itemsPerPage = 12;
 
     const groupedBills = useMemo(() => {
         const groups: Record<string, BillType[]> = {};
@@ -240,70 +240,97 @@ export const HistoryPage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {groupedBills[month].map(bill => (
-                                        <div key={bill.id} className={`p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 group transition-colors ${bill.type === 'settlement' ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : ''}`}>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-medium text-slate-800 dark:text-white">{bill.title}</p>
-                                                    {bill.type === 'settlement' && (
-                                                        <span className="px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full uppercase tracking-wide">
-                                                            Settlement
-                                                        </span>
-                                                    )}
+                                    {groupedBills[month].map(bill => {
+                                        // Check for SYSTEM notification
+                                        if (bill.categoryId === 'SYSTEM' && bill.amount === 0) {
+                                            return (
+                                                <div key={bill.id} className="p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 flex items-center gap-3 bg-indigo-50/30 dark:bg-indigo-900/10 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors">
+                                                    <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full shrink-0">
+                                                        <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-indigo-900 dark:text-indigo-200 text-sm">
+                                                            Notification Email Sent
+                                                        </div>
+                                                        <div className="text-xs text-indigo-500 dark:text-indigo-400">
+                                                            {(() => {
+                                                                try {
+                                                                    const date = parseISO(bill.date);
+                                                                    if (!isNaN(date.getTime())) return format(date, 'MMM d, h:mm a');
+                                                                } catch (e) { }
+                                                                return bill.date;
+                                                            })()}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                    {(() => {
-                                                        try {
-                                                            // Try to parse as ISO date
-                                                            const date = parseISO(bill.date);
-                                                            if (!isNaN(date.getTime())) {
-                                                                return format(date, 'MMM d');
-                                                            }
-                                                        } catch (e) {
-                                                            // Ignore parse errors
-                                                        }
-                                                        // Try parsing as regular date string
-                                                        try {
-                                                            const date = new Date(bill.date);
-                                                            if (!isNaN(date.getTime())) {
-                                                                return format(date, 'MMM d');
-                                                            }
-                                                        } catch (e) {
-                                                            // Ignore
-                                                        }
-                                                        // Fallback to just showing the raw date if billingMonth exists
-                                                        return bill.billingMonth || bill.date.substring(0, 10);
-                                                    })()} • {getCategoryName(bill.categoryId)}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <p className={`font-semibold ${bill.type === 'settlement' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
-                                                        ${bill.amount.toFixed(2)}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</p>
-                                                </div>
+                                            );
+                                        }
 
-                                                {/* Actions */}
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={(e) => handleEditClick(e, bill)}
-                                                        className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                                                        title="Edit Bill"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => handleDeleteClick(e, bill.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                                                        title="Delete Bill"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                        return (
+                                            <div key={bill.id} className={`p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 group transition-colors ${bill.type === 'settlement' ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : ''}`}>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-medium text-slate-800 dark:text-white">{bill.title}</p>
+                                                        {bill.type === 'settlement' && (
+                                                            <span className="px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full uppercase tracking-wide">
+                                                                Settlement
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                        {(() => {
+                                                            try {
+                                                                // Try to parse as ISO date
+                                                                const date = parseISO(bill.date);
+                                                                if (!isNaN(date.getTime())) {
+                                                                    return format(date, 'MMM d');
+                                                                }
+                                                            } catch (e) {
+                                                                // Ignore parse errors
+                                                            }
+                                                            // Try parsing as regular date string
+                                                            try {
+                                                                const date = new Date(bill.date);
+                                                                if (!isNaN(date.getTime())) {
+                                                                    return format(date, 'MMM d');
+                                                                }
+                                                            } catch (e) {
+                                                                // Ignore
+                                                            }
+                                                            // Fallback to just showing the raw date if billingMonth exists
+                                                            return bill.billingMonth || bill.date.substring(0, 10);
+                                                        })()} • {getCategoryName(bill.categoryId)}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <p className={`font-semibold ${bill.type === 'settlement' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
+                                                            ${bill.amount.toFixed(2)}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</p>
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={(e) => handleEditClick(e, bill)}
+                                                            className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                            title="Edit Bill"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleDeleteClick(e, bill.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                                            title="Delete Bill"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -324,8 +351,20 @@ export const HistoryPage: React.FC = () => {
                         Page {currentPage} of {totalPages}
                     </span>
                     <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
+                        onClick={() => {
+                            if (currentPage < totalPages) {
+                                setCurrentPage(p => p + 1);
+                            } else {
+                                // Try to go to previous year
+                                const currentYearIndex = availableYears.indexOf(currentYear);
+                                if (currentYearIndex < availableYears.length - 1) {
+                                    const nextYear = availableYears[currentYearIndex + 1];
+                                    loadYear(nextYear);
+                                    setCurrentPage(1);
+                                }
+                            }
+                        }}
+                        disabled={currentPage === totalPages && availableYears.indexOf(currentYear) === availableYears.length - 1}
                         className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-400" />

@@ -57,8 +57,8 @@ export const PinEntry: React.FC<PinEntryProps> = ({ mode, onSubmit, error, isLoa
                             const val = e.target.value.replace(/\D/g, '');
                             setPin(val);
                         }}
-                        placeholder="Enter 6+ digits"
-                        className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors"
+                        placeholder="••••••"
+                        className="w-full px-4 py-3 text-center text-2xl tracking-[0.5em] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:tracking-widest"
                         maxLength={12}
                         disabled={isLoading}
                     />

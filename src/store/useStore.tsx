@@ -20,8 +20,28 @@ interface StoreData {
     meta: StoreMeta;
     currentYear: string;
     currentBills: BillType[];
+    allBills: BillType[];
     monthStatus: Record<string, any>;
 }
+
+// Helper to extract year from billingMonth (handles "October 2023", "11/1/2022", etc.)
+const getYearFromMonth = (raw: string): string => {
+    if (!raw) return '';
+    try {
+        const date = new Date(raw);
+        if (!isNaN(date.getTime())) {
+            return date.getFullYear().toString();
+        }
+        // Fallback for "Month Year" if Date parsing fails (though Date usually handles it)
+        const parts = raw.split(' ');
+        if (parts.length === 2 && !isNaN(Number(parts[1]))) {
+            return parts[1];
+        }
+    } catch (e) {
+        console.warn('Failed to parse year from month:', raw);
+    }
+    return '';
+};
 
 const initialMeta: StoreMeta = {
     housemates: [],
@@ -82,6 +102,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             meta: initialMeta,
             currentYear: new Date().getFullYear().toString(),
             currentBills: [],
+            allBills: [],
             monthStatus: {}
         };
     });
@@ -303,25 +324,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             // Combine Bills
             const allBills = [...historyBills, ...manualBills];
 
-            // Helper to extract year from billingMonth (handles "October 2023", "11/1/2022", etc.)
-            const getYearFromMonth = (raw: string): string => {
-                if (!raw) return '';
-                try {
-                    const date = new Date(raw);
-                    if (!isNaN(date.getTime())) {
-                        return date.getFullYear().toString();
-                    }
-                    // Fallback for "Month Year" if Date parsing fails (though Date usually handles it)
-                    const parts = raw.split(' ');
-                    if (parts.length === 2 && !isNaN(Number(parts[1]))) {
-                        return parts[1];
-                    }
-                } catch (e) {
-                    console.warn('Failed to parse year from month:', raw);
-                }
-                return '';
-            };
-
             // Extract available years from all bills
             const yearsSet = new Set<string>();
             allBills.forEach(b => {
@@ -347,6 +349,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 meta,
                 currentYear: activeYear,
                 currentBills,
+                allBills,
                 monthStatus
             });
 
@@ -414,7 +417,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 console.log('Auto-syncing...');
                 syncData();
             }
-        }, 60000 * 10); // 10 minutes
+        }, 60000); // 1 minute
         return () => clearInterval(interval);
     }, [spreadsheetId, accessToken, isSyncing, syncData]);
 
@@ -533,8 +536,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addBill,
         addManualBill,
         addHousemate,
-        // Expose other actions as no-ops or implement them
-        loadYear: async (_year: string) => { },
+        loadYear: async (year: string) => {
+            setData(prev => ({
+                ...prev,
+                currentYear: year,
+                currentBills: prev.allBills.filter(b => getYearFromMonth(b.billingMonth) === year)
+            }));
+        },
         removeHousemate,
         updateHousemate,
         deleteBill: (_id: string) => { },

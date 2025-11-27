@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Mail } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
     const { housemates, billHistories, billCategories, currentYear } = useStore();
@@ -152,20 +152,44 @@ export const Dashboard: React.FC = () => {
                     {billHistories.length === 0 ? (
                         <p className="text-slate-400 italic">No bills recorded yet.</p>
                     ) : (
-                        billHistories.slice(0, 5).map(bill => (
-                            <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
-                                <div>
-                                    <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                                        {new Date(bill.date).toLocaleDateString()}
+                        [...billHistories]
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                            .slice(0, 5)
+                            .map(bill => {
+                                // Check for SYSTEM notification
+                                if (bill.categoryId === 'SYSTEM' && bill.amount === 0) {
+                                    return (
+                                        <div key={bill.id} className="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800 transition-colors">
+                                            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full shrink-0">
+                                                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium text-indigo-900 dark:text-indigo-200 text-sm">
+                                                    Notification Email Sent
+                                                </div>
+                                                <div className="text-xs text-indigo-500 dark:text-indigo-400">
+                                                    {new Date(bill.date).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div key={bill.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
+                                        <div>
+                                            <div className="font-semibold text-slate-800 dark:text-white">{bill.title}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                {new Date(bill.date).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="font-bold text-slate-900 dark:text-white">${bill.amount.toFixed(2)}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{bill.splitMethod} Split</div>
-                                </div>
-                            </div>
-                        ))
+                                );
+                            })
                     )}
                 </div>
             </div>
