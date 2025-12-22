@@ -58,6 +58,7 @@ interface StoreContextType {
     accessToken: string | null;
     housemates: Housemate[];
     billHistories: BillType[];
+    allBills: BillType[];
     billCategories: BillCategory[];
     balances: Record<string, number>;
     availableYears: string[];
@@ -526,6 +527,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         accessToken,
         housemates: data.meta.housemates,
         billHistories: data.currentBills,
+        allBills: data.allBills,
         billCategories: data.meta.billCategories,
         balances: data.meta.balances,
         availableYears: data.meta.availableYears,

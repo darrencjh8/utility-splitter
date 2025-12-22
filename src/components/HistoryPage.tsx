@@ -7,7 +7,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { EditBillModal } from './EditBillModal';
 
 export const HistoryPage: React.FC = () => {
-    const { billHistories, housemates, billCategories, availableYears, currentYear, loadYear, deleteBill, updateBill } = useStore();
+    const { allBills, housemates, billCategories, deleteBill, updateBill } = useStore();
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
     const [editBill, setEditBill] = useState<BillType | null>(null);
@@ -17,7 +17,7 @@ export const HistoryPage: React.FC = () => {
 
     const groupedBills = useMemo(() => {
         const groups: Record<string, BillType[]> = {};
-        billHistories.forEach(bill => {
+        allBills.forEach(bill => {
             // Normalize month to YYYY-MM format for consistent grouping and sorting
             let monthKey = '';
 
@@ -75,7 +75,7 @@ export const HistoryPage: React.FC = () => {
             groups[monthKey].push(bill);
         });
         return groups;
-    }, [billHistories]);
+    }, [allBills]);
 
     const sortedMonths = useMemo(() => {
         return Object.keys(groupedBills).sort((a, b) => {
@@ -115,11 +115,6 @@ export const HistoryPage: React.FC = () => {
             .reduce((sum, bill) => sum + bill.amount, 0);
     };
 
-    const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        loadYear(e.target.value);
-        setCurrentPage(1);
-    };
-
     const handleDeleteClick = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         setDeleteId(id);
@@ -149,26 +144,11 @@ export const HistoryPage: React.FC = () => {
                     <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                     Billing History
                 </h2>
-
-                {availableYears.length > 0 && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500 dark:text-slate-400">Year:</span>
-                        <select
-                            value={currentYear}
-                            onChange={handleYearChange}
-                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                        >
-                            {availableYears.map(year => (
-                                <option key={year} value={year}>{year}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
             </div>
 
             {sortedMonths.length === 0 ? (
                 <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 text-center transition-colors">
-                    <p className="text-slate-500 dark:text-slate-400">No billing history available for {currentYear}.</p>
+                    <p className="text-slate-500 dark:text-slate-400">No billing history available.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -354,17 +334,9 @@ export const HistoryPage: React.FC = () => {
                         onClick={() => {
                             if (currentPage < totalPages) {
                                 setCurrentPage(p => p + 1);
-                            } else {
-                                // Try to go to previous year
-                                const currentYearIndex = availableYears.indexOf(currentYear);
-                                if (currentYearIndex < availableYears.length - 1) {
-                                    const nextYear = availableYears[currentYearIndex + 1];
-                                    loadYear(nextYear);
-                                    setCurrentPage(1);
-                                }
                             }
                         }}
-                        disabled={currentPage === totalPages && availableYears.indexOf(currentYear) === availableYears.length - 1}
+                        disabled={currentPage === totalPages}
                         className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-400" />

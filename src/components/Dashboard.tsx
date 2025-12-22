@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { Wallet, TrendingUp, DollarSign, Mail } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-    const { housemates, billHistories, billCategories, currentYear } = useStore();
+    const { housemates, billHistories, allBills, billCategories, currentYear } = useStore();
 
     const summary = useMemo(() => {
         // We only calculate expenses and payable for the CURRENT VIEW (current year)
@@ -149,10 +149,10 @@ export const Dashboard: React.FC = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Recent Bills</h3>
                 <div className="space-y-3">
-                    {billHistories.length === 0 ? (
+                    {allBills.length === 0 ? (
                         <p className="text-slate-400 italic">No bills recorded yet.</p>
                     ) : (
-                        [...billHistories]
+                        [...allBills]
                             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                             .slice(0, 5)
                             .map(bill => {
